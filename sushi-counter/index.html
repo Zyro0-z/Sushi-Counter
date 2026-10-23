@@ -1,0 +1,1416 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Sushi">
+<meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<!--ARTIFACT-START-->
+<title>Contador de Sushi</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&display=swap">
+<style>
+/* Layout: iOS tab app. Cada pestaña es una vista con barra de navegación translúcida + título grande; hojas modales desde abajo. */
+:root{
+  --bg:#F2F2F7; --card:#FFFFFF; --sheet:#F2F2F7; --sheet-card:#FFFFFF; --seg-th:#FFFFFF;
+  --label:#000000; --label2:rgba(60,60,67,.62); --label3:rgba(60,60,67,.3);
+  --sep:rgba(60,60,67,.18); --fill:rgba(118,118,128,.12); --fill2:rgba(118,118,128,.2);
+  --bar:rgba(246,246,248,.78); --tab:rgba(249,249,251,.84);
+  --rim:rgba(0,0,0,.07); --shd:rgba(30,20,10,.13); --medal-off:#D6D6DC;
+  --shadow:0 1px 2px rgba(0,0,0,.04),0 8px 24px rgba(40,30,20,.06);
+  --green:#34C759; --red:#FF3B30; --gold:#FFB800;
+  --accent:#FA5D3C;
+  --accent-soft:color-mix(in srgb,var(--accent) 14%,transparent);
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",system-ui,"Segoe UI",Roboto,sans-serif;
+  --round:ui-rounded,"SF Pro Rounded","Nunito",-apple-system,system-ui,sans-serif;
+  --spring:cubic-bezier(.32,.72,0,1);
+  --bounce:cubic-bezier(.34,1.56,.64,1);
+  --gl:max(16px,env(safe-area-inset-left,0px));
+  --gr:max(16px,env(safe-area-inset-right,0px));
+  --st:env(safe-area-inset-top,0px);
+  --sb:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#000000; --card:#1C1C1E; --sheet:#1C1C1E; --sheet-card:#2C2C2E; --seg-th:#636366;
+    --label:#FFFFFF; --label2:rgba(235,235,245,.6); --label3:rgba(235,235,245,.28);
+    --sep:rgba(84,84,88,.6); --fill:rgba(118,118,128,.24); --fill2:rgba(118,118,128,.36);
+    --bar:rgba(20,20,22,.76); --tab:rgba(22,22,24,.84);
+    --rim:rgba(255,255,255,.2); --shd:rgba(0,0,0,.55); --medal-off:#3A3A3C;
+    --shadow:none; --green:#30D158; --red:#FF453A; --gold:#FFD60A;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#000000; --card:#1C1C1E; --sheet:#1C1C1E; --sheet-card:#2C2C2E; --seg-th:#636366;
+  --label:#FFFFFF; --label2:rgba(235,235,245,.6); --label3:rgba(235,235,245,.28);
+  --sep:rgba(84,84,88,.6); --fill:rgba(118,118,128,.24); --fill2:rgba(118,118,128,.36);
+  --bar:rgba(20,20,22,.76); --tab:rgba(22,22,24,.84);
+  --rim:rgba(255,255,255,.2); --shd:rgba(0,0,0,.55); --medal-off:#3A3A3C;
+  --shadow:none; --green:#30D158; --red:#FF453A; --gold:#FFD60A;
+  color-scheme:dark;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--label);font:17px/1.29 var(--font);letter-spacing:-.41px;overflow:hidden;touch-action:manipulation;-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%}
+[hidden]{display:none!important}
+button{font:inherit;color:inherit;letter-spacing:inherit;touch-action:manipulation;cursor:pointer}
+button:disabled{cursor:default}
+:focus-visible{outline:2.5px solid var(--accent);outline-offset:2px;border-radius:10px}
+svg{display:block}
+.num{font-family:var(--round);font-variant-numeric:tabular-nums;letter-spacing:0}
+
+/* ---------- Estructura ---------- */
+.app{position:fixed;inset:0;background:#000}
+.stage{position:absolute;inset:0;background:var(--bg);transform-origin:50% 0;transition:transform .5s var(--spring),border-radius .5s var(--spring),filter .5s;overflow:hidden}
+body.sheet-open .stage{transform:translateY(calc(var(--st) + 8px)) scale(.94);border-radius:14px;filter:brightness(.92)}
+.view{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:calc(96px + var(--sb))}
+.view.enter{animation:viewIn .42s var(--spring)}
+@keyframes viewIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.nav{position:sticky;top:0;z-index:20;padding-top:var(--st);transition:background-color .25s,box-shadow .25s}
+.nav.scrolled{background:var(--bar);-webkit-backdrop-filter:saturate(180%) blur(22px);backdrop-filter:saturate(180%) blur(22px);box-shadow:0 .5px 0 var(--sep)}
+.nav-in{height:44px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding-left:var(--gl);padding-right:var(--gr)}
+.nav-t{font-weight:600;font-size:17px;opacity:0;transform:translateY(4px);transition:opacity .2s,transform .25s var(--spring);white-space:nowrap}
+.nav.scrolled .nav-t{opacity:1;transform:none}
+.nav-l{justify-self:start;display:flex;gap:6px}.nav-r{justify-self:end;display:flex;gap:6px}
+.nb{border:0;background:none;color:var(--accent);font-size:17px;padding:8px 2px;display:inline-flex;align-items:center;gap:5px;transition:opacity .2s,color .2s}
+.nb.b{font-weight:600}
+.nb:active{opacity:.4}
+.nb:disabled{color:var(--label3)}
+.nb svg{width:23px;height:23px}
+.ib{width:36px;height:36px;border-radius:50%;justify-content:center;padding:0;background:var(--fill)}
+.ib svg{width:19px;height:19px}
+.content{padding-left:var(--gl);padding-right:var(--gr);max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.lt-wrap{padding-top:2px}
+.lt{font-size:34px;line-height:41px;font-weight:700;letter-spacing:.37px;margin:0;text-wrap:balance}
+.lt-sub{margin:2px 0 0;color:var(--label2);font-size:15px;letter-spacing:-.24px}
+.sec-h{display:flex;align-items:baseline;justify-content:space-between;margin:10px 4px -4px}
+.sec-h h2{margin:0;font-size:22px;font-weight:700;letter-spacing:.35px}
+.sec-a{color:var(--label2);font-size:13px;letter-spacing:-.08px}
+.card{background:var(--card);border-radius:20px;box-shadow:var(--shadow)}
+
+/* ---------- Comensales ---------- */
+.chips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:0 calc(-1 * var(--gr)) 0 calc(-1 * var(--gl));padding:2px var(--gr) 4px var(--gl);scroll-padding-left:var(--gl)}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:0 0 auto;display:flex;align-items:center;gap:8px;border:0;border-radius:99px;padding:5px 12px 5px 5px;background:var(--card);box-shadow:var(--shadow);transition:background-color .35s var(--spring),color .35s,transform .3s var(--bounce);-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.chip:active{transform:scale(.95)}
+.chip .av{width:28px;height:28px;font-size:13px}
+.chip-n{font-weight:600;font-size:15px;letter-spacing:-.24px;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip-c{font-family:var(--round);font-weight:800;font-size:13px;min-width:22px;padding:2px 6px;border-radius:99px;background:var(--fill);text-align:center;font-variant-numeric:tabular-nums;transition:background-color .35s}
+.chip.on{background:var(--c);color:#fff}
+.chip.on .chip-c{background:rgba(255,255,255,.25)}
+.chip.on .av{background:#fff;color:var(--c)}
+.chip.add{padding:0;width:38px;height:38px;justify-content:center;color:var(--accent)}
+.chip.add svg{width:20px;height:20px}
+.av{display:inline-grid;place-items:center;border-radius:50%;background:var(--c);color:#fff;font-family:var(--round);font-weight:900;flex:0 0 auto;transition:background-color .35s,color .35s}
+.av.xl{width:84px;height:84px;font-size:38px;box-shadow:0 10px 30px color-mix(in srgb,var(--c) 40%,transparent)}
+.av.md{width:34px;height:34px;font-size:15px}
+
+/* ---------- Héroe ---------- */
+.hero{padding:18px 16px 16px;display:flex;flex-direction:column;align-items:center;gap:16px}
+.ring-btn{border:0;background:none;padding:0;position:relative;width:min(220px,62vw);aspect-ratio:1;max-width:100%;border-radius:50%;-webkit-user-select:none;user-select:none}
+.ring{width:100%;height:100%;transform:rotate(-90deg)}
+.ring circle{fill:none;stroke-width:15}
+.ring-track{stroke:var(--fill)}
+.ring-bar{stroke:var(--accent);stroke-linecap:round;transition:stroke-dashoffset .9s var(--spring),stroke .5s}
+.ring-bar.full{stroke:url(#g-goldring)}
+.ring-glow{fill:none;stroke-width:15;stroke:var(--accent);opacity:0;filter:blur(8px)}
+.ring-c{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.ring-k{font-size:13px;font-weight:600;color:var(--label2);text-transform:uppercase;letter-spacing:.6px;display:flex;align-items:center;gap:5px}
+.ring-k i{width:8px;height:8px;border-radius:50%;background:var(--c,var(--accent))}
+.ring-n{font-size:clamp(52px,17vw,72px);font-weight:900;line-height:1}
+.ring-s{font-size:14px;color:var(--label2);letter-spacing:-.15px}
+.ring-btn.bump .ring-n{animation:bump .45s var(--bounce)}
+@keyframes bump{40%{transform:scale(1.08)}}
+.stats{width:100%;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.stat{display:flex;flex-direction:column;align-items:center;gap:3px;padding:10px 2px;border-radius:14px;background:var(--fill);min-width:0}
+.stat-l{font-size:11px;font-weight:600;color:var(--label2);text-transform:uppercase;letter-spacing:.4px;white-space:nowrap}
+.stat-v{font-family:var(--round);font-weight:800;font-size:17px;font-variant-numeric:tabular-nums;letter-spacing:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.amort{width:100%;display:flex;flex-direction:column;gap:7px}
+.amort-top{display:flex;justify-content:space-between;font-size:13px;font-weight:600;color:var(--label2);text-transform:uppercase;letter-spacing:.4px}
+.amort-top b{color:var(--label);font-family:var(--round);font-weight:800;letter-spacing:0}
+.amort-t{margin:0;font-size:15px;letter-spacing:-.24px;color:var(--label)}
+.amort-t.ok{color:var(--green)}
+.meter{position:relative;height:8px;border-radius:99px;background:var(--fill);overflow:hidden}
+.meter i{position:absolute;inset:0 auto 0 0;border-radius:inherit;background:var(--accent);transition:width .8s var(--spring),background-color .4s;transform-origin:left}
+.meter.ok i{background:var(--green)}
+.meter.sm{height:6px}
+.meter.anim i{animation:grow .9s var(--spring)}
+@keyframes grow{from{transform:scaleX(0)}}
+
+/* ---------- Piezas ---------- */
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (min-width:560px){.grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (min-width:740px){.grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.pc{position:relative;display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto 1fr auto;gap:2px 8px;padding:14px 14px 12px;min-height:138px;background:var(--card);border-radius:20px;box-shadow:var(--shadow);overflow:hidden;cursor:pointer;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;transition:transform .45s var(--bounce),box-shadow .3s;isolation:isolate}
+.pc:active{transform:scale(.955);transition-duration:.12s}
+.pc-ic{grid-row:1;grid-column:1;width:58px;height:58px;margin:-4px 0 0 -4px}
+.pc-ic svg{width:100%;height:100%;overflow:visible}
+.pc-n{grid-row:1;grid-column:2;justify-self:end;font-size:34px;font-weight:900;line-height:1;color:var(--label);transition:color .3s}
+.pc.zero .pc-n{color:var(--label3)}
+.pc-txt{grid-row:3;grid-column:1/3;display:flex;flex-direction:column;gap:1px;padding-right:40px;min-width:0}
+.pc-name{font-weight:600;font-size:16px;letter-spacing:-.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pc-meta{font-size:12px;color:var(--label2);letter-spacing:0}
+.pc-minus{position:absolute;right:10px;bottom:10px;width:32px;height:32px;border-radius:50%;border:0;display:grid;place-items:center;background:var(--fill);color:var(--label2);transition:transform .4s var(--bounce),opacity .25s;z-index:2}
+.pc-minus svg{width:16px;height:16px}
+.pc-minus:active{transform:scale(.85);background:var(--fill2)}
+.pc.zero .pc-minus{transform:scale(.4);opacity:0;pointer-events:none}
+.pc-plus{display:none}
+.rip{position:absolute;width:220px;height:220px;margin:-110px 0 0 -110px;border-radius:50%;background:var(--accent);pointer-events:none;z-index:-1}
+.plus1{position:absolute;pointer-events:none;font-family:var(--round);font-weight:900;font-size:22px;color:var(--accent);z-index:3;margin:-14px 0 0 -14px}
+.grid.list{grid-template-columns:minmax(0,1fr);gap:0;background:var(--card);border-radius:20px;box-shadow:var(--shadow);overflow:hidden}
+.grid.list .pc{display:flex;align-items:center;gap:12px;min-height:0;padding:8px 12px 8px 12px;border-radius:0;box-shadow:none;background:none}
+.grid.list .pc+.pc::before{content:"";position:absolute;top:0;left:72px;right:0;height:.5px;background:var(--sep)}
+.grid.list .pc:active{transform:none;background:var(--fill)}
+.grid.list .pc-ic{width:48px;height:48px;margin:0}
+.grid.list .pc-txt{order:2;flex:1;padding:0}
+.grid.list .pc-n{order:3;font-size:26px}
+.grid.list .pc-minus{order:4;position:static}
+.grid.list .pc-plus{order:5;display:grid;place-items:center;width:32px;height:32px;border-radius:50%;background:var(--accent);color:#fff}
+.grid.list .pc-plus svg{width:16px;height:16px}
+.grid.list .pc.zero .pc-minus{transform:scale(.4)}
+
+/* ---------- Filas / listas agrupadas ---------- */
+.gsec{display:flex;flex-direction:column}
+.glabel{font-size:13px;color:var(--label2);text-transform:uppercase;letter-spacing:-.08px;margin:12px 16px 7px}
+.gfoot{font-size:13px;color:var(--label2);letter-spacing:-.08px;margin:7px 16px 0;line-height:1.35}
+.group{background:var(--card);border-radius:12px;overflow:hidden}
+.sheet .group{background:var(--sheet-card)}
+.group.pad{padding:14px 16px}
+.row{position:relative;display:flex;align-items:center;gap:12px;width:100%;min-height:44px;padding:6px 16px;border:0;background:none;text-align:left;color:var(--label);font-size:17px}
+.row+.row::before{content:"";position:absolute;top:0;right:0;left:var(--ins,16px);height:.5px;background:var(--sep)}
+button.row:active,.row.tap:active{background:var(--fill)}
+.row-l{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row-v{color:var(--label2);font-variant-numeric:tabular-nums;white-space:nowrap}
+.row-in{flex:1;min-width:0;border:0;background:none;color:var(--label2);font:inherit;letter-spacing:inherit;text-align:right;padding:8px 0;outline:none}
+.row-in:focus{color:var(--label)}
+.row .chev{width:14px;height:14px;color:var(--label3);flex:0 0 auto}
+.row.danger{color:var(--red);justify-content:center}
+.row.accent{color:var(--accent)}
+.row.armed{background:color-mix(in srgb,var(--red) 12%,transparent);font-weight:600}
+.row .ricon{width:34px;height:34px;flex:0 0 auto}
+.row .ricon svg{width:100%;height:100%}
+.sub{display:block;font-size:13px;color:var(--label2);letter-spacing:-.08px}
+
+/* Interruptor iOS */
+.sw{position:relative;flex:0 0 auto;width:51px;height:31px}
+.sw input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer;z-index:1}
+.sw span{position:absolute;inset:0;border-radius:99px;background:var(--fill2);transition:background-color .3s}
+.sw span::after{content:"";position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 3px 8px rgba(0,0,0,.15),0 3px 1px rgba(0,0,0,.06);transition:transform .35s var(--spring),width .2s}
+.sw input:checked+span{background:var(--green)}
+.sw input:checked+span::after{transform:translateX(20px)}
+.sw input:active+span::after{width:32px}
+.sw input:checked:active+span::after{transform:translateX(15px)}
+.sw input:focus-visible+span{outline:2.5px solid var(--accent);outline-offset:2px}
+
+/* Control segmentado */
+.seg{position:relative;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);background:var(--fill);border-radius:9px;padding:2px;width:100%}
+.seg button{position:relative;z-index:1;border:0;background:none;font-size:13px;font-weight:500;letter-spacing:-.08px;padding:7px 4px;color:var(--label);transition:font-weight .2s;white-space:nowrap}
+.seg button[aria-pressed="true"]{font-weight:600}
+.seg-th{position:absolute;top:2px;bottom:2px;left:2px;width:calc((100% - 4px) / var(--n));transform:translateX(calc(100% * var(--i)));background:var(--seg-th);border-radius:7px;box-shadow:0 3px 8px rgba(0,0,0,.12),0 3px 1px rgba(0,0,0,.04);transition:transform .4s var(--spring)}
+
+/* Stepper */
+.stepper{display:flex;flex:0 0 auto;background:var(--fill);border-radius:8px;overflow:hidden}
+.stepper button{width:46px;height:32px;border:0;background:none;display:grid;place-items:center;color:var(--label)}
+.stepper button:active{background:var(--fill2)}
+.stepper button svg{width:17px;height:17px}
+.stepper i{width:1px;margin:7px 0;background:var(--sep)}
+
+/* Muestras de color */
+.swatches{display:flex;flex-wrap:wrap;gap:12px}
+.swc{width:34px;height:34px;border-radius:50%;border:0;background:var(--c);position:relative;transition:transform .3s var(--bounce)}
+.swc::after{content:"";position:absolute;inset:-5px;border-radius:50%;border:2.5px solid var(--c);opacity:0;transform:scale(.8);transition:opacity .2s,transform .3s var(--bounce)}
+.swc.on::after{opacity:1;transform:none}
+.swc:active{transform:scale(.88)}
+
+/* ---------- Desafíos ---------- */
+.sum{padding:18px;display:grid;grid-template-columns:auto 1fr;gap:6px 16px;align-items:center}
+.sum-n{font-family:var(--round);font-weight:900;font-size:46px;line-height:1;letter-spacing:0;grid-row:1/3}
+.sum-n span{font-size:22px;color:var(--label3)}
+.sum-t{font-weight:600;font-size:15px;letter-spacing:-.24px}
+.sum .meter{grid-column:2}
+.sum-medals{grid-column:1/3;display:flex;gap:4px;flex-wrap:wrap;margin-top:8px}
+.sum-medals svg{width:30px;height:30px}
+.ch-row{--ins:78px;align-items:flex-start;padding:12px 16px;gap:14px}
+.ch-row .medal{width:48px;height:48px;flex:0 0 auto}
+.row-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.row-t{font-weight:600;font-size:16px;letter-spacing:-.3px;display:flex;align-items:center;gap:6px}
+.row-d{font-size:13px;color:var(--label2);letter-spacing:-.08px}
+.row-p{font-size:12px;color:var(--label2);font-variant-numeric:tabular-nums;letter-spacing:0}
+.row-ok{font-size:13px;color:var(--green);font-weight:600;display:flex;align-items:center;gap:4px}
+.row-ok svg{width:14px;height:14px}
+.ch-row .meter{margin-top:5px}
+.tag{font-style:normal;font-size:11px;font-weight:700;padding:2px 7px;border-radius:99px;background:var(--accent-soft);color:var(--accent);letter-spacing:.2px}
+.cnt{font-family:var(--round);font-weight:800;font-size:13px;color:var(--label2);align-self:center;font-variant-numeric:tabular-nums}
+.medal.locked .mg{opacity:.5}
+.medal.locked .mi{filter:grayscale(1);opacity:.55}
+.ch-row.fresh .medal{animation:medalIn .9s var(--bounce)}
+@keyframes medalIn{0%{transform:scale(.3) rotate(-30deg)}60%{transform:scale(1.15) rotate(6deg)}100%{transform:none}}
+.duel{padding:16px;display:flex;flex-direction:column;gap:12px}
+.duel h3,.chart-card h3{margin:0;font-size:15px;font-weight:600;color:var(--label2);letter-spacing:-.24px;display:flex;justify-content:space-between}
+.dl{display:grid;grid-template-columns:20px 34px 1fr auto;gap:10px;align-items:center}
+.dl-pos{font-family:var(--round);font-weight:900;color:var(--label3);text-align:center}
+.dl-pos.p1{color:var(--gold)}
+.dl-main{display:flex;flex-direction:column;gap:5px;min-width:0}
+.dl-name{font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dl-bar{height:8px;border-radius:99px;background:var(--fill);overflow:hidden}
+.dl-bar i{display:block;height:100%;border-radius:inherit;background:var(--c);animation:grow 1s var(--spring);transform-origin:left}
+.dl-n{font-family:var(--round);font-weight:900;font-size:20px;font-variant-numeric:tabular-nums}
+.next{display:flex;align-items:center;gap:14px;padding:14px 16px;border:0;text-align:left;width:100%;transition:transform .4s var(--bounce)}
+.next:active{transform:scale(.98)}
+.next .medal{width:46px;height:46px;flex:0 0 auto}
+.next .chev{width:14px;height:14px;color:var(--label3)}
+.eyebrow{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--accent)}
+
+/* ---------- Historial ---------- */
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.tile{background:var(--card);border-radius:16px;padding:12px 6px;display:flex;flex-direction:column;align-items:center;gap:2px;box-shadow:var(--shadow);min-width:0}
+.tile b{font-family:var(--round);font-weight:900;font-size:22px;font-variant-numeric:tabular-nums;letter-spacing:0}
+.tile span{font-size:11px;color:var(--label2);text-transform:uppercase;font-weight:600;letter-spacing:.3px;white-space:nowrap}
+.chart-card{padding:16px 14px 10px}
+.chart{width:100%;height:auto;margin-top:8px;overflow:visible}
+.chart .gl{stroke:var(--sep);stroke-width:1}
+.chart .tx{fill:var(--label2);font:500 10px var(--font);letter-spacing:0}
+.chart .tv{fill:var(--label);font:800 11px var(--round);letter-spacing:0}
+.chart .bar{fill:var(--fill2);transform-box:fill-box;transform-origin:50% 100%;animation:barUp .9s var(--spring) both}
+.chart .bar.cur{fill:var(--accent)}
+@keyframes barUp{from{transform:scaleY(0)}}
+.h-row{--ins:16px;padding:10px 16px}
+.h-date{display:flex;flex-direction:column;align-items:center;justify-content:center;width:44px;height:48px;border-radius:12px;background:var(--fill);flex:0 0 auto}
+.h-date b{font-family:var(--round);font-weight:900;font-size:19px;line-height:1}
+.h-date span{font-size:10px;font-weight:700;text-transform:uppercase;color:var(--accent);letter-spacing:.4px}
+.h-av{display:flex}
+.h-av .av{width:20px;height:20px;font-size:10px;border:2px solid var(--card);margin-left:-6px}
+.h-av .av:first-child{margin-left:0}
+.h-tot{font-family:var(--round);font-weight:900;font-size:22px;font-variant-numeric:tabular-nums}
+.empty{padding:34px 20px;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;color:var(--label2);font-size:15px}
+.empty svg{width:92px;height:92px;margin-bottom:6px}
+.empty b{color:var(--label);font-size:17px}
+
+/* ---------- Barra de pestañas ---------- */
+.tabbar{position:absolute;left:0;right:0;bottom:0;z-index:30;display:grid;grid-template-columns:repeat(4,1fr);padding:6px var(--gr) calc(var(--sb) + 4px) var(--gl);background:var(--tab);-webkit-backdrop-filter:saturate(180%) blur(22px);backdrop-filter:saturate(180%) blur(22px);box-shadow:0 -.5px 0 var(--sep)}
+.tb{position:relative;border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding:2px 0 4px;color:var(--label3);font-size:10px;font-weight:500;letter-spacing:.1px;transition:color .25s}
+.tb svg{width:27px;height:27px;transition:transform .45s var(--bounce)}
+.tb[aria-selected="true"]{color:var(--accent)}
+.tb[aria-selected="true"] svg{transform:scale(1.06)}
+.tb:active svg{transform:scale(.85)}
+.tb .fillsel{fill:currentColor;opacity:0;transition:opacity .25s}
+.tb[aria-selected="true"] .fillsel{opacity:.18}
+.badge{position:absolute;top:0;left:calc(50% + 6px);min-width:18px;height:18px;padding:0 5px;border-radius:99px;background:var(--red);color:#fff;font:700 12px/18px var(--font);text-align:center;letter-spacing:0;animation:badgeIn .5s var(--bounce)}
+@keyframes badgeIn{from{transform:scale(0)}}
+
+/* ---------- Hoja modal ---------- */
+.backdrop{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.32);opacity:0;transition:opacity .45s}
+body.sheet-open .backdrop{opacity:1}
+.sheet{position:fixed;left:0;right:0;bottom:0;margin:0 auto;max-width:600px;z-index:41;max-height:calc(100% - var(--st) - 18px);background:var(--sheet);border-radius:14px 14px 0 0;transform:translateY(105%);transition:transform .5s var(--spring);overflow-y:auto;overscroll-behavior:contain;padding-bottom:calc(var(--sb) + 20px);box-shadow:0 -10px 40px rgba(0,0,0,.18)}
+body.sheet-open .sheet{transform:translateY(0)}
+.sh-grab{position:sticky;top:0;height:0;z-index:3}
+.sh-grab::after{content:"";position:absolute;left:50%;top:6px;width:36px;height:5px;margin-left:-18px;border-radius:99px;background:var(--label3)}
+.sh-head{position:sticky;top:0;z-index:2;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;min-height:56px;padding:8px var(--gr) 0 var(--gl);background:var(--sheet);touch-action:none}
+.sh-head h3{margin:0;font-size:17px;font-weight:600;text-align:center}
+.sh-head .nb:last-child{justify-self:end}
+.sh-body{padding:4px var(--gr) 0 var(--gl);display:flex;flex-direction:column;gap:12px}
+.sh-hero{display:flex;flex-direction:column;align-items:center;gap:8px;padding:10px 0 4px;text-align:center}
+.sh-hero h4{margin:4px 0 0;font-size:22px;font-weight:700;letter-spacing:.35px;text-wrap:balance}
+.sh-hero p{margin:0;color:var(--label2);font-size:15px;max-width:34ch}
+.sh-hero .medal{width:96px;height:96px}
+.big{font-family:var(--round);font-weight:900;font-size:64px;line-height:1;letter-spacing:0}
+.btn{border:0;border-radius:14px;padding:15px 18px;font-weight:600;font-size:17px;background:var(--accent);color:#fff;width:100%;transition:transform .35s var(--bounce),opacity .2s}
+.btn:active{transform:scale(.97);opacity:.85}
+.btn.ghost{background:var(--fill);color:var(--red)}
+.btn.ghost.armed{background:var(--red);color:#fff}
+.picks{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:2px}
+.picks::-webkit-scrollbar{display:none}
+.pick{flex:0 0 auto;width:64px;display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 4px;border-radius:14px;border:2px solid transparent;background:var(--fill);font-size:11px;font-weight:600;transition:border-color .2s,background-color .2s,transform .3s var(--bounce)}
+.pick svg{width:38px;height:38px}
+.pick.on{border-color:var(--accent);background:var(--accent-soft)}
+.pick:active{transform:scale(.93)}
+.mini-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:8px}
+.mini{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;border-radius:12px;background:var(--fill);font-size:11px;color:var(--label2)}
+.mini svg{width:34px;height:34px}
+.mini b{font-family:var(--round);font-weight:900;font-size:17px;color:var(--label)}
+.kv{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.kv div{background:var(--sheet-card);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.kv span{font-size:12px;color:var(--label2);font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+.kv b{font-family:var(--round);font-weight:800;font-size:19px;letter-spacing:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:6px}
+.kv b svg{width:26px;height:26px;flex:0 0 auto}
+
+/* ---------- Avisos ---------- */
+.banner{position:fixed;left:0;right:0;top:0;z-index:60;margin:0 auto;max-width:440px;padding:calc(var(--st) + 8px) var(--gr) 0 var(--gl);transform:translateY(-140%);transition:transform .6s var(--spring);pointer-events:none}
+.banner.show{transform:none;pointer-events:auto}
+.bn{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:22px;background:var(--bar);-webkit-backdrop-filter:saturate(180%) blur(26px);backdrop-filter:saturate(180%) blur(26px);box-shadow:0 12px 40px rgba(0,0,0,.18),0 0 0 .5px var(--sep);border:0;width:100%;text-align:left}
+.bn .medal{width:44px;height:44px;flex:0 0 auto}
+.bn-t{display:flex;flex-direction:column;gap:1px;min-width:0}
+.bn-t small{font-size:12px;font-weight:600;color:var(--label2);text-transform:uppercase;letter-spacing:.4px}
+.bn-t b{font-size:16px;font-weight:600}
+.bn-t span{font-size:13px;color:var(--label2)}
+.hud{position:fixed;left:50%;bottom:calc(var(--sb) + 92px);z-index:55;transform:translate(-50%,20px) scale(.9);opacity:0;padding:10px 16px;border-radius:99px;background:var(--bar);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);box-shadow:0 8px 30px rgba(0,0,0,.16),0 0 0 .5px var(--sep);font-size:15px;font-weight:600;white-space:nowrap;transition:transform .45s var(--spring),opacity .3s;pointer-events:none}
+.hud.show{transform:translate(-50%,0);opacity:1}
+#fx{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:70}
+
+/* Odómetro */
+.odo{display:inline-flex;height:1em;line-height:1;overflow:hidden;font-variant-numeric:tabular-nums}
+.odo-c{display:block;height:1em;overflow:hidden}
+.odo-s{display:flex;flex-direction:column;transition:transform .7s cubic-bezier(.2,.9,.25,1.08)}
+.odo-s span{display:block;height:1em;text-align:center}
+
+.shd{fill:var(--shd)}
+.rim{stroke:var(--rim);stroke-width:1}
+.mono{stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}
+}
+</style>
+<!--ARTIFACT-HEAD-END-->
+</head>
+<body>
+<!--ARTIFACT-BODY-START-->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="g-bronze" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F2B47C"/><stop offset="1" stop-color="#B0662F"/></linearGradient>
+    <linearGradient id="g-silver" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E4E9EF"/><stop offset="1" stop-color="#8592A3"/></linearGradient>
+    <linearGradient id="g-gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFE07A"/><stop offset="1" stop-color="#E39A00"/></linearGradient>
+    <linearGradient id="g-accent" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:color-mix(in srgb,var(--accent) 62%,#fff)"/><stop offset="1" style="stop-color:var(--accent)"/></linearGradient>
+    <linearGradient id="g-goldring" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFD24A"/><stop offset=".5" stop-color="#FF9F0A"/><stop offset="1" stop-color="#FF5E3A"/></linearGradient>
+  </defs>
+</svg>
+
+<div class="app">
+<div class="stage" id="stage">
+
+  <!-- CONTADOR -->
+  <section class="view" id="v-count" aria-label="Contador">
+    <header class="nav"><div class="nav-in">
+      <div class="nav-l"><button class="nb" id="btnUndo" aria-label="Deshacer la última pieza" disabled></button></div>
+      <div class="nav-t">Contador</div>
+      <div class="nav-r"><button class="nb b" id="btnFinish" disabled>Terminar</button></div>
+    </div></header>
+    <div class="content">
+      <div class="lt-wrap"><h1 class="lt">Contador</h1><p class="lt-sub" id="buffetLine"></p></div>
+      <div class="chips" id="chips" role="tablist" aria-label="Comensales"></div>
+      <div class="hero card">
+        <button class="ring-btn" id="ringBtn" aria-label="Alternar entre tu total y el de la mesa">
+          <svg class="ring" viewBox="0 0 200 200" aria-hidden="true"><circle class="ring-track" cx="100" cy="100" r="86"/><circle class="ring-bar" id="ringBar" cx="100" cy="100" r="86"/></svg>
+          <span class="ring-c"><span class="ring-k" id="ringK"></span><span class="ring-n num" id="ringN"></span><span class="ring-s" id="ringS"></span></span>
+        </button>
+        <div class="stats">
+          <div class="stat"><span class="stat-l">Tiempo</span><span class="stat-v" id="stTime">00:00</span></div>
+          <div class="stat"><span class="stat-l">Ritmo</span><span class="stat-v" id="stPace">—</span></div>
+          <div class="stat"><span class="stat-l">Por pieza</span><span class="stat-v" id="stCost">—</span></div>
+          <div class="stat"><span class="stat-l">Kcal</span><span class="stat-v" id="stKcal">0</span></div>
+        </div>
+        <div class="amort">
+          <div class="amort-top"><span>Amortización</span><b id="amPct">0 %</b></div>
+          <div class="meter" id="amMeter"><i id="amBar" style="width:0%"></i></div>
+          <p class="amort-t" id="amTxt"></p>
+        </div>
+      </div>
+      <div class="sec-h"><h2>Piezas</h2><span class="sec-a">Toca para sumar</span></div>
+      <div class="grid" id="grid"></div>
+      <button class="next card" id="nextCh"></button>
+    </div>
+  </section>
+
+  <!-- DESAFÍOS -->
+  <section class="view" id="v-ch" aria-label="Desafíos" hidden>
+    <header class="nav"><div class="nav-in">
+      <div class="nav-l"></div>
+      <div class="nav-t">Desafíos</div>
+      <div class="nav-r"><button class="nb ib" id="btnNewCh" aria-label="Crear desafío"></button></div>
+    </div></header>
+    <div class="content" id="chBody"></div>
+  </section>
+
+  <!-- HISTORIAL -->
+  <section class="view" id="v-hist" aria-label="Historial" hidden>
+    <header class="nav"><div class="nav-in"><div class="nav-l"></div><div class="nav-t">Historial</div><div class="nav-r"></div></div></header>
+    <div class="content" id="histBody"></div>
+  </section>
+
+  <!-- AJUSTES -->
+  <section class="view" id="v-set" aria-label="Ajustes" hidden>
+    <header class="nav"><div class="nav-in"><div class="nav-l"></div><div class="nav-t">Ajustes</div><div class="nav-r"></div></div></header>
+    <div class="content" id="setBody"></div>
+  </section>
+
+  <nav class="tabbar" role="tablist" aria-label="Secciones">
+    <button class="tb" data-tab="count" role="tab" aria-selected="true"></button>
+    <button class="tb" data-tab="ch" role="tab" aria-selected="false"></button>
+    <button class="tb" data-tab="hist" role="tab" aria-selected="false"></button>
+    <button class="tb" data-tab="set" role="tab" aria-selected="false"></button>
+  </nav>
+</div>
+</div>
+
+<div class="backdrop" id="backdrop" hidden></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" hidden></div>
+<div class="banner" id="banner" role="status" aria-live="polite"></div>
+<div class="hud" id="hud" role="status" aria-live="polite"></div>
+<canvas id="fx" aria-hidden="true"></canvas>
+
+<script>
+(() => {
+'use strict';
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const RM = matchMedia('(prefers-reduced-motion: reduce)');
+
+/* =========================================================
+   ICONOS DE PIEZAS (diseño propio, 48×48)
+   ========================================================= */
+const RICE='#F7F2E8', GRAIN='#E4D9C3', NORI='#1F2D26', SAL='#FF7F5C', SAL2='#FFC9B4', AVO='#93C252';
+const SH = (cx=24, rx=15) => `<ellipse cx="${cx}" cy="42" rx="${rx}" ry="2.4" class="shd"/>`;
+const dots = (pts, r, fill, extra='') => pts.map(([x,y,rot=0]) => `<ellipse cx="${x}" cy="${y}" rx="${r[0]}" ry="${r[1]}" fill="${fill}" transform="rotate(${rot} ${x} ${y})"${extra}/>`).join('');
+const roe = (() => {
+  const P=[[14.5,18.6],[19,17],[24,16.4],[29,17],[33.5,18.6],[16.8,21.6],[21.4,20.4],[26.6,20.4],[31.2,21.6],[24,22.8],[19.2,13.6],[24,12.4],[28.8,13.6],[21.6,9.6],[26.4,9.6]];
+  return P.map(([x,y])=>`<circle cx="${x}" cy="${y}" r="2.45" fill="#FF8A1F"/><circle cx="${x}" cy="${y}" r="2.45" fill="none" stroke="#E2650A" stroke-width=".5"/><circle cx="${x-.8}" cy="${y-.9}" r=".75" fill="#FFF1D6"/>`).join('');
+})();
+const ICON = {
+  nigiri: SH()+`<rect x="9" y="22" width="30" height="17" rx="8.5" fill="${RICE}" class="rim"/>`
+    + dots([[15,33,-20],[21,36,15],[27.5,33.5],[33.5,35.5,-25],[18,30],[31,30,30],[25,37.2,-10]],[1.7,1],GRAIN)
+    + `<path d="M5.5 25C5.5 18 13.5 13.5 24 13.5S42.5 17.5 42.5 23.5c0 3-2.4 4.6-6 4.5L11.5 29.5C7.8 29.8 5.5 28.2 5.5 25Z" fill="${SAL}"/>
+       <path d="M13.5 15.8c2.4 3.4 3 8 2 13M21.5 14c2.4 3.6 3.1 8.6 2.1 14.4M29.5 14.4c2.3 3.4 3 8 2.2 13.4M37 17c1.6 2.6 2 6 1.3 10" fill="none" stroke="${SAL2}" stroke-width="1.7" stroke-linecap="round"/>
+       <path d="M9.5 21c3-3.4 8-5 13.5-5.2" fill="none" stroke="#fff" stroke-opacity=".6" stroke-width="1.8" stroke-linecap="round"/>`,
+  maki: SH()+`<circle cx="24" cy="23" r="17" fill="${NORI}" class="rim"/>
+       <path d="M10.8 16a15.6 15.6 0 0 1 9.4-8" fill="none" stroke="#fff" stroke-opacity=".2" stroke-width="2" stroke-linecap="round"/>
+       <circle cx="24" cy="23" r="13" fill="${RICE}"/>`
+    + dots([[17,15.5,-30],[30.5,15,20],[35,23,80],[31,31,-40],[18,31.5,30],[13.5,23,90],[24,12.5],[24.5,34]],[1.6,.9],GRAIN)
+    + `<circle cx="24" cy="23" r="6.4" fill="${SAL}"/><path d="M24 16.6a6.4 6.4 0 0 1 6.4 6.4H24Z" fill="${AVO}"/>
+       <path d="M24 16.6a6.4 6.4 0 0 1 6.4 6.4" fill="none" stroke="#6E9E34" stroke-width="1"/>
+       <path d="M20.2 20.6a4.2 4.2 0 0 1 2.4-2.2" stroke="#fff" stroke-opacity=".65" stroke-width="1.4" fill="none" stroke-linecap="round"/>`,
+  uramaki: SH()+`<circle cx="24" cy="23" r="17" fill="${RICE}" class="rim"/>`
+    + dots([[13,17,30],[26,8.5,-10],[38,19,60],[32,35,-30],[15,34,40],[10.5,26,80]],[1.4,.75],'#D8B377')
+    + dots([[18.5,10.5,-40],[33,11.5,20],[37.5,28,100],[23,37.5,0],[11,20.5,60]],[1.4,.75],'#2A2522')
+    + `<circle cx="24" cy="23" r="9.6" fill="${NORI}"/><circle cx="24" cy="23" r="7.6" fill="#FFF6EE"/>
+       <path d="M24 15.4a7.6 7.6 0 0 0 0 15.2Z" fill="${SAL}"/><path d="M24 15.4a7.6 7.6 0 0 1 7.6 7.6H24Z" fill="${AVO}"/>
+       <path d="M12.5 13.5a14 14 0 0 1 6-4" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-opacity=".9"/>`,
+  sashimi: SH()+`<path d="M7 37C5 23 17 9 41 8c2 17-11 30-34 29Z" fill="#5DAA47"/>
+       <path d="M9 35C17 26 27 17 38 11M17 27.5l-1.5-5M24 21.5l-1-5.5M30 16.5l-.5-5" stroke="#4A8F38" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+       <g transform="rotate(-30 24 24)">
+         <rect x="10.5" y="12.5" width="9.5" height="24" rx="4.75" fill="#EE6447"/>
+         <rect x="19.3" y="11.5" width="9.5" height="24" rx="4.75" fill="${SAL}"/>
+         <rect x="28.1" y="10.5" width="9.5" height="24" rx="4.75" fill="#FF9673"/>
+         <path d="M12.6 20l2.7 1.6 2.7-1.6M12.6 27l2.7 1.6 2.7-1.6M21.4 19l2.7 1.6 2.7-1.6M21.4 26l2.7 1.6 2.7-1.6M30.2 18l2.7 1.6 2.7-1.6M30.2 25l2.7 1.6 2.7-1.6" stroke="${SAL2}" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+         <path d="M31 13.5v4" stroke="#fff" stroke-opacity=".7" stroke-width="1.5" stroke-linecap="round"/>
+       </g>`,
+  gunkan: SH()+`<rect x="9" y="19" width="30" height="21" rx="9" fill="${NORI}" class="rim"/>
+       <path d="M12.5 27v6M17 28.5v7" stroke="#fff" stroke-opacity=".14" stroke-width="2" stroke-linecap="round"/>
+       <ellipse cx="24" cy="19.5" rx="15" ry="5.6" fill="${RICE}"/>
+       <ellipse cx="35" cy="13" rx="4.4" ry="2.6" transform="rotate(-25 35 13)" fill="#7FB85A"/><ellipse cx="35" cy="13" rx="2.6" ry="1.4" transform="rotate(-25 35 13)" fill="#C7E3A6"/>` + roe,
+  temaki: SH(25,13)+`<path d="M11.5 17.5L29.5 41.5c1 1.4 3 1.1 3.4-.6L39.5 15Z" fill="${NORI}" class="rim"/>
+       <path d="M17 21.5l11.5 15.5" stroke="#fff" stroke-opacity=".15" stroke-width="2" stroke-linecap="round"/>
+       <rect x="28" y="3.5" width="3.2" height="12" rx="1.6" transform="rotate(22 29.6 9.5)" fill="#86C25C"/>
+       <rect x="32.4" y="5.5" width="3.2" height="11" rx="1.6" transform="rotate(40 34 11)" fill="#A9D67E"/>
+       <ellipse cx="25.5" cy="16.2" rx="14" ry="5.2" transform="rotate(-5 25.5 16.2)" fill="${RICE}"/>
+       <path d="M15.2 15.2c1.4-6.6 8.6-9.8 13.2-6.6-1 4.6-7 7.8-13.2 6.6Z" fill="${SAL}"/>
+       <path d="M18.6 11.6c2.3-1.6 5-2.1 7.2-1.3" stroke="${SAL2}" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+       <path d="M29.5 17.2c2-3.2 6.2-4.2 8.8-2.6-1.5 2.8-5.2 3.8-8.8 2.6Z" fill="#E9F3C8"/>`,
+  gyoza: SH()+`<path d="M5.5 31C5.5 21.5 13.8 14 24 14s18.5 7.5 18.5 17c0 2.8-1.8 4.2-4.8 4.2H10.3c-3 0-4.8-1.4-4.8-4.2Z" fill="#F3DDAE"/>
+       <path d="M6 31.6c3.6 2.2 9 3.2 18 3.2s14.4-1 18-3.2c.2 2.4-1.6 3.6-4.4 3.6H10.4C7.6 35.2 5.8 34 6 31.6Z" fill="#C88A3E"/>
+       <path d="M13 19l2.4 5.2M18.4 15.8l1.5 5.6M24 14.6v5.8M29.6 15.8l-1.5 5.6M35 19l-2.4 5.2" stroke="#D6AF6F" stroke-width="2" stroke-linecap="round"/>
+       <path d="M10 27.5c2-3 5-5 8-6" stroke="#fff" stroke-opacity=".6" stroke-width="1.8" fill="none" stroke-linecap="round"/>`,
+  tempura: SH()+`<path d="M38.5 15.5c2.4-4.4 6.6-5.4 8.4-3.2-1.4 1.2-1.6 3.4-.4 5.4-2.4 1.4-5.6 1-8-2.2Z" fill="#E8503A"/>
+       <path d="M41 14.5l3.5 1" stroke="#B8321F" stroke-width="1" stroke-linecap="round"/>
+       <path d="M8.5 35c-3-11 4.5-21.5 17-23.5 7.5-1.2 12.4 1.6 14 5.5-6.4-.6-12.4 1.6-16.4 6.4-3 3.7-4.2 7.8-4.4 12-3.6 1.4-8.2 1.4-10.2-.4Z" fill="#E7A646"/>`
+    + dots([[13,30.5],[16,24],[21,18.5],[27,15],[33,15],[11.5,25.5],[18,29.5],[23.5,22],[29.5,19],[14.5,34.5],[36,16.5]],[1.5,1.3],'#F8D17D')
+    + dots([[19,26],[25.5,18],[13.8,28.3],[30,15.8]],[.9,.8],'#B8742A')
+    + `<path d="M11 29c1-6 5-11 11-13.5" stroke="#fff" stroke-opacity=".45" stroke-width="1.7" fill="none" stroke-linecap="round"/>`,
+  edamame: SH()+`<path d="M7.5 33c-1.4-5.6 2.6-9.4 7.6-10.4 2.6-5.2 7.8-8.6 13-8.4 3.6-3.6 9.6-4.4 12.4-.8 2.6 3.4.6 8-4 9.6-1.6 4.6-5.6 7.8-10.8 8.8-3.6 4-9.6 6.6-14 5-2.2-.8-3.6-2-4.2-3.8Z" fill="#6FAF3E"/>
+       <circle cx="14.5" cy="30.5" r="5" fill="#8CC759"/><circle cx="23.5" cy="23.5" r="5.3" fill="#8CC759"/><circle cx="33" cy="17" r="5" fill="#8CC759"/>`
+    + dots([[12.8,28.6,-40],[21.7,21.4,-40],[31.3,15,-40]],[1.8,1],'#fff',' opacity=".55"')
+    + `<path d="M40.5 12.5c1.4-2 3-3 5-3" stroke="#5E9634" stroke-width="2" stroke-linecap="round" fill="none"/>`,
+  mochi: SH()+`<circle cx="31" cy="25" r="10.5" fill="#BFDC9A"/><circle cx="17.5" cy="28" r="11" fill="#F7B9CC"/>`
+    + dots([[11,30],[15,34],[21,33.5],[24,27],[19,22],[13,25],[34,20],[37,26],[33,30.5],[28.5,22]],[.6,.6],'#fff',' opacity=".9"')
+    + dots([[13.5,23.5,-30],[28,19.5,-30]],[3,1.9],'#fff',' opacity=".55"'),
+};
+const icon = k => `<svg viewBox="0 0 48 48" aria-hidden="true">${ICON[k]||ICON.maki}</svg>`;
+
+/* Iconos de interfaz, trazo 24×24 */
+const UI = {
+  plus:'<path d="M12 5v14M5 12h14"/>', minus:'<path d="M5.5 12h13"/>',
+  undo:'<path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
+  check:'<path d="M5 12.5l4.5 4.5L19 7.5"/>', chev:'<path d="M9 5l7 7-7 7"/>',
+  tCount:'<circle class="fillsel" cx="10.5" cy="14" r="7.5"/><circle cx="10.5" cy="14" r="7.5"/><circle cx="10.5" cy="14" r="3.4"/><path d="M15.5 2.5l5.5 10.5M19.5 2l3.2 10.8"/>',
+  tCh:'<path class="fillsel" d="M7.5 3.5h9v6a4.5 4.5 0 0 1-9 0z"/><path d="M7.5 3.5h9v6a4.5 4.5 0 0 1-9 0z"/><path d="M7.5 5.5H4.5a3 3 0 0 0 3.3 4.4M16.5 5.5h3a3 3 0 0 1-3.3 4.4M12 14v3.5M8 20.5h8M9.5 17.5h5"/>',
+  tHist:'<circle class="fillsel" cx="12" cy="12" r="8.5"/><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3 3.8V8h4.2"/><path d="M12 7.5V12l3.2 2"/>',
+  tSet:'<path d="M4 7h8.5M17.5 7H20M4 17h2.5M11.5 17H20"/><circle class="fillsel" cx="15" cy="7" r="2.4"/><circle cx="15" cy="7" r="2.4"/><circle class="fillsel" cx="9" cy="17" r="2.4"/><circle cx="9" cy="17" r="2.4"/>',
+  roll:'<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.6"/>',
+};
+const ui = (k, cls='') => `<svg viewBox="0 0 24 24" class="mono ${cls}" aria-hidden="true">${UI[k]}</svg>`;
+
+/* Glifos de medallas */
+const GLYPH = {
+  target:'<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r=".8" fill="#fff"/>',
+  layers:'<path d="M12 4l8 4-8 4-8-4z"/><path d="M4 12l8 4 8-4M4 16l8 4 8-4"/>',
+  balance:'<path d="M12 4v15M7 20h10M5 7.5h14"/><path d="M5 7.5l-2.6 6h5.2zM19 7.5l-2.6 6h5.2z"/>',
+  bolt:'<path d="M13 3L5.5 13.2h5.8L10.5 21 18.5 10.8h-5.8z" fill="#fff" fill-opacity=".25"/>',
+  flame:'<path d="M12 21c-3.9 0-6.4-2.7-6.4-6.2 0-3.3 2.4-5 3.5-8 1.5 1.6 2 3 2 4.6 1.2-1 2.6-3.4 2.3-6.4 3.4 2.2 5.2 5.9 5.2 9.8 0 3.5-2.6 6.2-6.6 6.2z" fill="#fff" fill-opacity=".25"/>',
+  coin:'<circle cx="12" cy="12" r="8.5"/><path d="M15.2 8.6a4.4 4.4 0 1 0 0 6.8M7.6 11h6M7.6 13.5h6"/>',
+  clock:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.2 2"/>',
+  crown:'<path d="M4.5 17.5L3.5 8l5 4 3.5-6 3.5 6 5-4-1 9.5z" fill="#fff" fill-opacity=".25"/><path d="M5 20.5h14"/>',
+  star:'<path d="M12 3.8l2.5 5.2 5.7.8-4.1 4 1 5.6L12 16.7l-5.1 2.7 1-5.6-4.1-4 5.7-.8z" fill="#fff" fill-opacity=".25"/>',
+};
+function medal(ch, locked, cls='') {
+  const g = ch.g || {};
+  const fill = locked ? 'style="fill:var(--medal-off);stroke:var(--medal-off)"' : `fill="url(#g-${ch.tier})" stroke="url(#g-${ch.tier})"`;
+  let inner = '';
+  if (g.txt) inner = `<text class="mg" x="28" y="${g.txt.length>2?33:34.5}" text-anchor="middle" font-family="ui-rounded,'SF Pro Rounded',Nunito,system-ui,sans-serif" font-weight="900" font-size="${g.txt.length>2?15:19}" fill="#fff">${g.txt}</text>`;
+  else if (g.p) inner = `<g class="mg" transform="translate(16 16)" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${GLYPH[g.p]}</g>`;
+  else if (g.icon) inner = `<g class="mi" transform="translate(12.5 11.5) scale(.65)">${ICON[g.icon]||''}</g>`;
+  return `<svg viewBox="0 0 56 56" class="medal ${locked?'locked':''} ${cls}" aria-hidden="true">
+    <path d="M28 5l20 11.5v23L28 51 8 39.5v-23z" ${fill} stroke-width="5" stroke-linejoin="round"/>
+    ${locked?'':'<path d="M28 9.2l16.4 9.4v18.8L28 46.8 11.6 37.4V18.6z" fill="none" stroke="#fff" stroke-opacity=".38" stroke-width="1.3" stroke-linejoin="round"/><path d="M10 17.5L28 7l18 10.5v6C35 19 21 19 10 23.5z" fill="#fff" opacity=".16"/>'}
+    ${inner}</svg>`;
+}
+
+/* =========================================================
+   DATOS
+   ========================================================= */
+const DEFAULT_TYPES = [
+  {id:'nigiri',  name:'Nigiri',  kcal:60,  on:true},
+  {id:'maki',    name:'Maki',    kcal:35,  on:true},
+  {id:'uramaki', name:'Uramaki', kcal:50,  on:true},
+  {id:'sashimi', name:'Sashimi', kcal:35,  on:true},
+  {id:'gunkan',  name:'Gunkan',  kcal:55,  on:true},
+  {id:'temaki',  name:'Temaki',  kcal:180, on:true},
+  {id:'gyoza',   name:'Gyoza',   kcal:45,  on:true},
+  {id:'tempura', name:'Tempura', kcal:90,  on:true},
+  {id:'edamame', name:'Edamame', kcal:30,  on:true},
+  {id:'mochi',   name:'Mochi',   kcal:95,  on:true},
+];
+const DINER_COLORS = ['#FA5D3C','#0A84FF','#30B0C7','#AF52DE','#FF9F0A','#34C759','#FF2D55','#5E5CE6','#A2845E'];
+const ACCENTS = [
+  {id:'sake',name:'Sake',m:'salmón',c:'#FA5D3C'},{id:'maguro',name:'Maguro',m:'atún',c:'#E0313F'},
+  {id:'uni',name:'Uni',m:'erizo',c:'#EE9B00'},{id:'wasabi',name:'Wasabi',m:'rábano picante',c:'#4FA232'},
+  {id:'matcha',name:'Matcha',m:'té verde',c:'#249478'},{id:'ao',name:'Ao',m:'azul',c:'#0A84FF'},
+  {id:'murasaki',name:'Murasaki',m:'morado',c:'#7D5BF0'},{id:'sakura',name:'Sakura',m:'cerezo',c:'#EC4F8A'},
+];
+const CURRENCIES = {EUR:'€', USD:'$', GBP:'£'};
+const KEY = 'sushi-counter.v1';
+
+function examples() {
+  const D = 86400000, now = Date.now();
+  const mk = (ago, buffet, price, mins, diners) => ({id:'ex'+ago, ex:true, date:now-ago*D, buffet, price, carta:1.2, dur:mins*60000, diners});
+  return [
+    mk(23,'Kyoto Garden',17.5,68,[{name:'Tú',color:'#FA5D3C',counts:{nigiri:9,maki:8,uramaki:10,sashimi:5,gyoza:4,mochi:1},medals:['c10','amort']}]),
+    mk(15,'Sakura Wok',19.9,84,[{name:'Tú',color:'#FA5D3C',counts:{nigiri:14,maki:6,uramaki:12,sashimi:9,gunkan:4,tempura:3,mochi:2},medals:['c10','c50','amort','carta']},{name:'Lucía',color:'#0A84FF',counts:{nigiri:8,uramaki:9,sashimi:12,edamame:2},medals:['c10','amort']}]),
+    mk(6,'Kyoto Garden',17.5,95,[{name:'Tú',color:'#FA5D3C',counts:{nigiri:18,maki:10,uramaki:14,sashimi:15,gunkan:5,temaki:2,gyoza:6,mochi:2},medals:['c10','c50','meta','amort','carta','purista','maraton']}]),
+  ];
+}
+function fresh() {
+  return {
+    v:1,
+    settings:{buffet:'Buffet libre', price:18.9, carta:1.2, cur:'EUR', goal:40, theme:'system', accent:'sake', layout:'grid', sound:true, haptics:true},
+    types: DEFAULT_TYPES.map(t => ({...t})),
+    diners:[{id:'d1', name:'Tú', color:DINER_COLORS[0]}],
+    active:'d1',
+    session:{start:null, log:[], done:{}},
+    history: examples(),
+    custom: [],
+    trophies: {},
+  };
+}
+function load() {
+  try { const raw = localStorage.getItem(KEY); if (raw) return migrate(JSON.parse(raw)); } catch (e) {}
+  return fresh();
+}
+function migrate(s) {
+  const f = fresh();
+  s.settings = {...f.settings, ...(s.settings||{})};
+  s.types = (s.types||[]).filter(t => ICON[t.id]);
+  const ids = new Set(s.types.map(t => t.id));
+  DEFAULT_TYPES.forEach(t => { if (!ids.has(t.id)) s.types.push({...t}); });
+  if (!Array.isArray(s.diners) || !s.diners.length) s.diners = f.diners;
+  if (!s.diners.find(d => d.id === s.active)) s.active = s.diners[0].id;
+  s.session = s.session || f.session; s.session.log = s.session.log || []; s.session.done = s.session.done || {};
+  s.history = s.history || []; s.custom = s.custom || []; s.trophies = s.trophies || {};
+  return s;
+}
+let S = load();
+let saveT;
+function save() { clearTimeout(saveT); saveT = setTimeout(saveNow, 120); }
+function saveNow() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
+addEventListener('visibilitychange', () => { if (document.hidden) saveNow(); });
+addEventListener('pagehide', saveNow);
+
+/* =========================================================
+   UTILIDADES
+   ========================================================= */
+const diner = id => S.diners.find(d => d.id === id) || S.diners[0];
+const typeById = id => S.types.find(t => t.id === id);
+const initial = n => (n || '?').trim().charAt(0).toUpperCase() || '?';
+const sum = o => Object.values(o||{}).reduce((a, b) => a + b, 0);
+const nf1 = v => v.toLocaleString('es-ES', {maximumFractionDigits:1, minimumFractionDigits:1});
+const nf0 = v => Math.round(v).toLocaleString('es-ES');
+function money(v, dec=2) {
+  try { return new Intl.NumberFormat('es-ES', {style:'currency', currency:S.settings.cur, minimumFractionDigits:dec, maximumFractionDigits:dec}).format(v); }
+  catch (e) { return v.toFixed(dec) + ' ' + CURRENCIES[S.settings.cur]; }
+}
+function clock(ms) {
+  const s = Math.max(0, Math.floor(ms/1000)), h = Math.floor(s/3600), m = Math.floor(s%3600/60), x = s%60;
+  return h ? `${h}:${String(m).padStart(2,'0')}:${String(x).padStart(2,'0')}` : `${String(m).padStart(2,'0')}:${String(x).padStart(2,'0')}`;
+}
+function durShort(ms) { const m = Math.max(1, Math.round(ms/60000)); return m >= 60 ? `${Math.floor(m/60)} h ${m%60} min` : `${m} min`; }
+const parseNum = v => { const n = parseFloat(String(v).replace(',', '.')); return isFinite(n) ? n : 0; };
+const fmtDec = v => String(v).replace('.', ',');
+function counts(dId) { const c = {}; for (const e of S.session.log) if (!dId || e.d === dId) c[e.k] = (c[e.k]||0) + 1; return c; }
+function ctx(id) {
+  const log = S.session.log.filter(e => e.d === id);
+  const by = {}; log.forEach(e => by[e.k] = (by[e.k]||0) + 1);
+  const el = S.session.start ? (Date.now() - S.session.start) / 60000 : 0;
+  return {log, by, total:log.length, distinct:Object.keys(by).length, el};
+}
+function bestWindow(log, ms) {
+  let best = 0, j = 0;
+  for (let i = 0; i < log.length; i++) { while (log[i].t - log[j].t > ms) j++; best = Math.max(best, i - j + 1); }
+  return best;
+}
+const kcalOf = by => Object.entries(by).reduce((a, [k, n]) => a + n * (typeById(k)?.kcal || 0), 0);
+
+/* =========================================================
+   DESAFÍOS
+   ========================================================= */
+const CH = [
+  {id:'c10', t:'Calentando', d:'Come 10 piezas', tier:'bronze', g:{txt:'10'}, f:c => [c.total, 10]},
+  {id:'c50', t:'Medio centenar', d:'Llega a 50 piezas', tier:'silver', g:{txt:'50'}, f:c => [c.total, 50]},
+  {id:'c100', t:'Centenario', d:'Cruza la barrera de las 100 piezas', tier:'gold', g:{txt:'100'}, f:c => [c.total, 100]},
+  {id:'meta', t:'Objetivo cumplido', d:() => `Alcanza tu objetivo de ${S.settings.goal} piezas`, tier:'gold', g:{p:'target'}, f:c => [c.total, S.settings.goal]},
+  {id:'carta', t:'Carta completa', d:'Prueba 6 tipos de pieza distintos', tier:'silver', g:{p:'layers'}, f:c => [c.distinct, 6, `${Math.min(c.distinct,6)} de 6 tipos`]},
+  {id:'equi', t:'Equilibrista', d:'5 o más piezas de 4 tipos diferentes', tier:'silver', g:{p:'balance'}, f:c => { const n = Object.values(c.by).filter(v => v >= 5).length; return [n, 4, `${Math.min(n,4)} de 4 tipos`]; }},
+  {id:'sprint', t:'Sprint', d:'10 piezas en 5 minutos', tier:'silver', g:{p:'bolt'}, f:c => { const b = bestWindow(c.log, 300000); return [b, 10, `Mejor tramo: ${b} en 5 min`]; }},
+  {id:'samurai', t:'Ritmo samurái', d:'5 piezas en 60 segundos', tier:'gold', g:{p:'flame'}, f:c => { const b = bestWindow(c.log, 60000); return [b, 5, `Mejor minuto: ${b} piezas`]; }},
+  {id:'amort', t:'Amortizado', d:'Lo comido vale más que el buffet', tier:'bronze', g:{p:'coin'}, f:c => [c.total*S.settings.carta, S.settings.price, `${money(Math.min(c.total*S.settings.carta, S.settings.price))} de ${money(S.settings.price)}`]},
+  {id:'purista', t:'Purista', d:'15 piezas de sashimi', tier:'silver', g:{icon:'sashimi'}, f:c => [c.by.sashimi||0, 15]},
+  {id:'nigiri', t:'Nigirista', d:'20 nigiris', tier:'silver', g:{icon:'nigiri'}, f:c => [c.by.nigiri||0, 20]},
+  {id:'gyoza', t:'Maestro gyoza', d:'12 gyozas', tier:'bronze', g:{icon:'gyoza'}, f:c => [c.by.gyoza||0, 12]},
+  {id:'hueco', t:'Siempre hay hueco', d:'Pide mochi después de 40 piezas', tier:'bronze', g:{icon:'mochi'}, f:c => {
+    let n = 0, ok = false; for (const e of c.log) { if (e.k === 'mochi' && n >= 40) ok = true; n++; }
+    if (ok) return [1, 1, 'Hecho'];
+    return c.total >= 40 ? [.95, 1, 'Ya puedes pedir el postre'] : [Math.min(c.total,40)/40*.9, 1, `${c.total} de 40 piezas antes del postre`];
+  }},
+  {id:'maraton', t:'Maratón', d:'90 minutos en la mesa', tier:'bronze', g:{p:'clock'}, f:c => [Math.floor(c.el), 90, `${Math.min(Math.floor(c.el),90)} de 90 min`]},
+  {id:'rey', t:'Rey de la mesa', d:'Saca 10 piezas de ventaja al resto', tier:'gold', g:{p:'crown'}, needs2:true, f:(c, id) => {
+    const others = Math.max(0, ...S.diners.filter(d => d.id !== id).map(d => S.session.log.filter(e => e.d === d.id).length));
+    const lead = c.total - others; return [Math.max(0, lead), 10, lead > 0 ? `${lead} de ventaja` : lead === 0 ? 'Empate' : `${-lead} por detrás`];
+  }},
+];
+function customDef(c) {
+  const tn = c.kind === 'all' ? 'piezas' : (typeById(c.kind)?.name || c.kind);
+  return {
+    id:c.id, custom:true, tier:'accent', g: c.kind === 'all' ? {p:'star'} : {icon:c.kind},
+    t: c.name || `${c.n} ${c.kind === 'all' ? 'piezas' : tn.toLowerCase()}`,
+    d: `${c.n} ${c.kind === 'all' ? 'piezas' : tn}${c.mins ? ` en ${c.mins} min` : ''}`,
+    f: x => { const log = c.kind === 'all' ? x.log : x.log.filter(e => e.k === c.kind); const v = c.mins ? bestWindow(log, c.mins*60000) : log.length; return [v, c.n, c.mins ? `Mejor tramo: ${v} de ${c.n}` : undefined]; },
+  };
+}
+const allCh = () => [...CH, ...S.custom.map(customDef)].filter(ch => !(ch.needs2 && S.diners.length < 2));
+const chById = id => [...CH, ...S.custom.map(customDef)].find(c => c.id === id);
+const chDesc = ch => typeof ch.d === 'function' ? ch.d() : ch.d;
+function evalCh(ch, id) {
+  const [cur, max, txt] = ch.f(ctx(id), id);
+  const p = max > 0 ? Math.max(0, Math.min(1, cur/max)) : 0;
+  return {cur, max, p, txt: txt || `${Math.min(Math.floor(cur), max)} de ${max}`};
+}
+const isDone = (id, chId) => (S.session.done[id] || []).includes(chId);
+let unseen = 0;
+function checkUnlocks(id) {
+  if (!S.session.log.length) return;
+  const got = [];
+  for (const ch of allCh()) {
+    if (isDone(id, ch.id)) continue;
+    if (evalCh(ch, id).p >= 1) { (S.session.done[id] = S.session.done[id] || []).push(ch.id); got.push(ch); }
+  }
+  if (!got.length) return;
+  save(); unseen += got.length; updateBadge();
+  got.forEach((ch, i) => setTimeout(() => celebrate(ch, id), i * 1900));
+  if (cur === 'ch') renderChallenges(got.map(c => c.id));
+}
+
+/* =========================================================
+   FEEDBACK: sonido, vibración, confeti, avisos
+   ========================================================= */
+let AC = null, streakN = 0, lastAdd = 0;
+function audio() { if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} } if (AC && AC.state === 'suspended') AC.resume(); return AC; }
+function tone(f, at, d, type='sine', vol=.12, glide=1.5) {
+  const a = audio(); if (!a) return;
+  const t = a.currentTime + at, o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f*glide, t + d*.7);
+  g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + .008); g.gain.exponentialRampToValueAtTime(.0001, t + d);
+  o.connect(g).connect(a.destination); o.start(t); o.stop(t + d + .03);
+}
+function feedback(kind) {
+  if (S.settings.sound) {
+    if (kind === 'add') tone(420 + Math.min(streakN, 14)*28, 0, .1, 'sine', .14, 1.6);
+    else if (kind === 'remove') tone(330, 0, .1, 'triangle', .1, .7);
+    else if (kind === 'unlock') [523, 659, 784, 1047].forEach((f, i) => tone(f, i*.085, .28, 'triangle', .09, 1.01));
+    else if (kind === 'tick') tone(900, 0, .04, 'sine', .04, 1);
+  }
+  if (S.settings.haptics && navigator.vibrate) { try { navigator.vibrate(kind === 'unlock' ? [18, 50, 24] : kind === 'remove' ? 6 : 10); } catch (e) {} }
+}
+let hudT;
+function hud(msg) { const h = $('#hud'); h.textContent = msg; h.classList.add('show'); clearTimeout(hudT); hudT = setTimeout(() => h.classList.remove('show'), 1600); }
+let bannerT, bannerQ = Promise.resolve();
+function celebrate(ch, id) {
+  feedback('unlock'); confetti(150);
+  const b = $('#banner'), d = diner(id);
+  b.innerHTML = `<button class="bn">${medal(ch, false)}<span class="bn-t"><small>Desafío completado${S.diners.length > 1 ? ' · ' + esc(d.name) : ''}</small><b>${esc(ch.t)}</b><span>${esc(chDesc(ch))}</span></span></button>`;
+  b.firstChild.onclick = () => { b.classList.remove('show'); go('ch'); };
+  requestAnimationFrame(() => b.classList.add('show'));
+  clearTimeout(bannerT); bannerT = setTimeout(() => b.classList.remove('show'), 3400);
+}
+const FX = {p:[], raf:0};
+function cssAccent() { return getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#FA5D3C'; }
+function confetti(n=140, ox, oy) {
+  if (RM.matches) return;
+  const c = $('#fx'), dpr = Math.min(2, devicePixelRatio || 1);
+  if (c.width !== innerWidth*dpr || c.height !== innerHeight*dpr) { c.width = innerWidth*dpr; c.height = innerHeight*dpr; }
+  const cols = [cssAccent(), '#FFD24A', '#34C759', '#0A84FF', '#FF2D55', '#F7F2E8', '#AF52DE', '#FF9F0A'];
+  const x0 = ox ?? innerWidth/2, y0 = oy ?? innerHeight*.3;
+  for (let i = 0; i < n; i++) {
+    const a = -Math.PI/2 + (Math.random() - .5)*2.2, sp = 7 + Math.random()*10;
+    FX.p.push({x:x0 + (Math.random()-.5)*40, y:y0, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp - 2, r:Math.random()*6.3, vr:(Math.random()-.5)*.4,
+      w:6 + Math.random()*6, h:3 + Math.random()*4, col:cols[i % cols.length], grain:Math.random() < .28, ph:Math.random()*6.3, life:0});
+  }
+  if (!FX.raf) FX.raf = requestAnimationFrame(fxLoop);
+}
+function fxLoop() {
+  const c = $('#fx'), x = c.getContext('2d'), dpr = Math.min(2, devicePixelRatio || 1);
+  x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, innerWidth, innerHeight);
+  FX.p = FX.p.filter(p => p.y < innerHeight + 30 && p.life < 420);
+  for (const p of FX.p) {
+    p.vy += .3; p.vx *= .985; p.vy *= .985; p.x += p.vx + Math.sin(p.life*.08 + p.ph)*.6; p.y += p.vy; p.r += p.vr; p.life++;
+    x.save(); x.translate(p.x, p.y); x.rotate(p.r); x.globalAlpha = Math.min(1, (420 - p.life)/60);
+    x.fillStyle = p.col;
+    if (p.grain) { x.beginPath(); x.ellipse(0, 0, p.w*.55, p.h*.5, 0, 0, 6.3); x.fill(); }
+    else { const s = Math.cos(p.life*.18 + p.ph); x.fillRect(-p.w/2, -p.h/2*s, p.w, p.h*s); }
+    x.restore();
+  }
+  FX.raf = FX.p.length ? requestAnimationFrame(fxLoop) : (x.clearRect(0, 0, innerWidth, innerHeight), 0);
+}
+
+/* =========================================================
+   ODÓMETRO
+   ========================================================= */
+class Odo {
+  constructor(el) { this.el = el; el.classList.add('odo', 'num'); this.s = null; this.cols = []; }
+  set(v) {
+    const s = String(v); if (s === this.s) return;
+    if (this.cols.length !== s.length) {
+      this.el.innerHTML = '';
+      this.cols = [...s].map(() => {
+        const c = document.createElement('span'); c.className = 'odo-c';
+        const st = document.createElement('span'); st.className = 'odo-s';
+        st.innerHTML = '0123456789'.split('').map(d => `<span>${d}</span>`).join('');
+        c.appendChild(st); this.el.appendChild(c); return st;
+      });
+      void this.el.offsetWidth;
+    }
+    [...s].forEach((d, i) => { this.cols[i].style.transform = `translateY(${-d*10}%)`; });
+    this.s = s; this.el.setAttribute('aria-label', s);
+  }
+}
+
+/* =========================================================
+   TEMA
+   ========================================================= */
+function applyLook() {
+  const r = document.documentElement;
+  if (S.settings.theme === 'system') r.removeAttribute('data-theme'); else r.setAttribute('data-theme', S.settings.theme);
+  r.style.setProperty('--accent', (ACCENTS.find(a => a.id === S.settings.accent) || ACCENTS[0]).c);
+}
+
+/* =========================================================
+   CONTADOR
+   ========================================================= */
+const RC = 2*Math.PI*86;
+const ODO = {ring:null, cards:{}};
+let ringMode = 'me';
+function buildGrid() {
+  const g = $('#grid');
+  g.className = 'grid' + (S.settings.layout === 'list' ? ' list' : '');
+  g.innerHTML = ''; ODO.cards = {};
+  S.types.filter(t => t.on).forEach(t => {
+    const el = document.createElement('div');
+    el.className = 'pc zero'; el.dataset.k = t.id; el.tabIndex = 0; el.setAttribute('role', 'button');
+    el.setAttribute('aria-label', `Sumar ${t.name}`);
+    el.innerHTML = `<span class="pc-ic">${icon(t.id)}</span><span class="pc-n"></span>
+      <span class="pc-txt"><span class="pc-name">${esc(t.name)}</span><span class="pc-meta">${t.kcal} kcal</span></span>
+      <button class="pc-minus" aria-label="Quitar ${esc(t.name)}">${ui('minus')}</button><span class="pc-plus" aria-hidden="true">${ui('plus')}</span>`;
+    g.appendChild(el);
+    ODO.cards[t.id] = new Odo(el.querySelector('.pc-n'));
+  });
+  if (!g.children.length) g.innerHTML = `<div class="empty card" style="grid-column:1/-1"><b>No hay piezas visibles</b>Actívalas en Ajustes › Piezas.</div>`;
+  updateCounter();
+}
+function renderChips() {
+  $('#chips').innerHTML = S.diners.map(d => {
+    const n = S.session.log.filter(e => e.d === d.id).length;
+    return `<button class="chip${d.id === S.active ? ' on' : ''}" role="tab" aria-selected="${d.id === S.active}" data-id="${d.id}" style="--c:${d.color}">
+      <span class="av" style="--c:${d.color}">${esc(initial(d.name))}</span><span class="chip-n">${esc(d.name)}</span><span class="chip-c">${n}</span></button>`;
+  }).join('') + `<button class="chip add" id="addDiner" aria-label="Añadir comensal">${ui('plus')}</button>`;
+}
+function updateCounter() {
+  const d = diner(S.active), c = ctx(S.active), st = S.settings;
+  const table = ringMode === 'table' && S.diners.length > 1;
+  const total = table ? S.session.log.length : c.total;
+  const goal = table ? st.goal * S.diners.length : st.goal;
+  ODO.ring.set(total);
+  $('#ringK').innerHTML = table ? 'Mesa' : `<i style="--c:${d.color}"></i>${esc(d.name)}`;
+  $('#ringS').textContent = total >= goal ? `Objetivo de ${goal} superado` : `de ${goal} piezas`;
+  const p = Math.min(1, total / Math.max(1, goal)), bar = $('#ringBar');
+  bar.style.strokeDashoffset = RC * (1 - p);
+  bar.classList.toggle('full', p >= 1);
+  bar.style.stroke = p >= 1 ? '' : (table ? 'var(--accent)' : d.color);
+  for (const k in ODO.cards) {
+    const n = c.by[k] || 0; ODO.cards[k].set(n);
+    ODO.cards[k].el.closest('.pc').classList.toggle('zero', !n);
+  }
+  $('#stPace').textContent = c.total && c.el >= 1 ? `${nf1(c.total / c.el)}/min` : '—';
+  $('#stCost').textContent = c.total ? money(st.price / c.total) : '—';
+  $('#stKcal').textContent = nf0(kcalOf(c.by));
+  updateTime();
+  const val = c.total * st.carta, ap = st.price > 0 ? val / st.price : 0;
+  $('#amPct').textContent = `${Math.min(999, Math.round(ap*100))} %`;
+  $('#amBar').style.width = `${Math.min(100, ap*100)}%`;
+  $('#amMeter').classList.toggle('ok', ap >= 1);
+  const at = $('#amTxt');
+  if (st.price <= 0) { at.textContent = 'Indica el precio del buffet en Ajustes.'; at.className = 'amort-t'; }
+  else if (ap >= 1) { at.textContent = `Llevas ${money(val - st.price)} de ventaja sobre la carta.`; at.className = 'amort-t ok'; }
+  else { const left = Math.ceil((st.price - val) / Math.max(.01, st.carta)); at.textContent = `Te ${left === 1 ? 'falta 1 pieza' : `faltan ${left} piezas`} para amortizar ${money(st.price)}.`; at.className = 'amort-t'; }
+  $('#buffetLine').textContent = `${st.buffet} · ${money(st.price)} por persona`;
+  $('#btnUndo').disabled = !S.session.log.length;
+  $('#btnFinish').disabled = !S.session.log.length;
+  $$('.chip[data-id]').forEach(ch => { const n = S.session.log.filter(e => e.d === ch.dataset.id).length; ch.querySelector('.chip-c').textContent = n; });
+  renderNext();
+}
+function updateTime() { $('#stTime').textContent = S.session.start ? clock(Date.now() - S.session.start) : '00:00'; }
+function renderNext() {
+  const id = S.active;
+  const rows = allCh().filter(ch => !isDone(id, ch.id)).map(ch => ({ch, r:evalCh(ch, id)})).sort((a, b) => b.r.p - a.r.p);
+  const el = $('#nextCh');
+  if (!rows.length) { el.innerHTML = `${medal(CH[2], false)}<span class="row-main"><span class="eyebrow">Vitrina completa</span><span class="row-t">Todos los desafíos superados</span><span class="row-d">Crea uno nuevo en la pestaña Desafíos.</span></span>`; return; }
+  const {ch, r} = rows[0];
+  el.innerHTML = `${medal(ch, true)}<span class="row-main"><span class="eyebrow">Siguiente desafío</span><span class="row-t">${esc(ch.t)}</span>
+    <span class="meter sm"><i style="width:${r.p*100}%"></i></span><span class="row-p">${esc(r.txt)}</span></span>${ui('chev','chev')}`;
+}
+function add(k, ev) {
+  const now = Date.now();
+  streakN = now - lastAdd < 4000 ? streakN + 1 : 0; lastAdd = now;
+  if (!S.session.start) S.session.start = now;
+  S.session.log.push({t:now, d:S.active, k});
+  feedback('add'); popFx(k, ev);
+  const rb = $('#ringBtn'); rb.classList.remove('bump'); void rb.offsetWidth; rb.classList.add('bump');
+  save(); updateCounter(); checkUnlocks(S.active);
+}
+function removeOne(k) {
+  for (let i = S.session.log.length - 1; i >= 0; i--) {
+    const e = S.session.log[i];
+    if (e.d === S.active && e.k === k) { S.session.log.splice(i, 1); break; }
+  }
+  if (!S.session.log.length) S.session.start = null;
+  feedback('remove'); save(); updateCounter();
+}
+function undo() {
+  const e = S.session.log.pop(); if (!e) return;
+  if (!S.session.log.length) S.session.start = null;
+  feedback('remove'); save(); updateCounter();
+  hud(`Deshecho: 1 ${typeById(e.k)?.name || 'pieza'}${S.diners.length > 1 ? ' de ' + diner(e.d).name : ''}`);
+}
+function popFx(k, ev) {
+  const card = $(`.pc[data-k="${k}"]`); if (!card || RM.matches) return;
+  card.querySelector('.pc-ic').animate([
+    {transform:'none'}, {transform:'translateY(-9px) scale(1.14) rotate(-7deg)', offset:.35},
+    {transform:'translateY(1px) scale(.96) rotate(2deg)', offset:.7}, {transform:'none'}
+  ], {duration:520, easing:'cubic-bezier(.3,.7,.3,1)'});
+  const r = card.getBoundingClientRect();
+  const pointer = ev && ev.detail !== 0 && ev.clientX;
+  const x = pointer ? ev.clientX - r.left : r.width/2, y = pointer ? ev.clientY - r.top : r.height/2;
+  const rip = document.createElement('span'); rip.className = 'rip'; rip.style.left = x+'px'; rip.style.top = y+'px';
+  card.appendChild(rip);
+  rip.animate([{transform:'scale(0)', opacity:.22}, {transform:'scale(1.4)', opacity:0}], {duration:600, easing:'cubic-bezier(.2,.8,.2,1)'}).onfinish = () => rip.remove();
+  const p = document.createElement('span'); p.className = 'plus1'; p.textContent = '+1'; p.style.left = x+'px'; p.style.top = y+'px';
+  card.appendChild(p);
+  p.animate([{transform:'translate(0,0) scale(.6)', opacity:0}, {transform:'translate(0,-22px) scale(1.15)', opacity:1, offset:.3}, {transform:`translate(${(Math.random()-.5)*20}px,-58px) scale(1)`, opacity:0}],
+    {duration:750, easing:'cubic-bezier(.2,.8,.2,1)'}).onfinish = () => p.remove();
+}
+
+/* =========================================================
+   DESAFÍOS (vista)
+   ========================================================= */
+function renderChallenges(fresh = []) {
+  const id = S.active, d = diner(id);
+  const rows = allCh().map(ch => ({ch, r:evalCh(ch, id), done:isDone(id, ch.id)}));
+  const done = rows.filter(x => x.done), todo = rows.filter(x => !x.done).sort((a, b) => b.r.p - a.r.p);
+  const row = ({ch, r, done}) => {
+    const n = S.trophies[ch.id] || 0;
+    return `<button class="row ch-row${fresh.includes(ch.id) ? ' fresh' : ''}" data-ch="${ch.id}">${medal(ch, !done)}
+      <span class="row-main"><span class="row-t">${esc(ch.t)}${ch.custom ? '<em class="tag">Tuyo</em>' : ''}</span><span class="row-d">${esc(chDesc(ch))}</span>
+      ${done ? `<span class="row-ok">${ui('check')}Completado</span>` : `<span class="meter sm anim"><i style="width:${r.p*100}%"></i></span><span class="row-p">${esc(r.txt)}</span>`}</span>
+      ${n ? `<span class="cnt" title="Veces conseguido">×${n}</span>` : ''}</button>`;
+  };
+  let duel = '';
+  if (S.diners.length > 1) {
+    const rk = S.diners.map(x => ({x, n:S.session.log.filter(e => e.d === x.id).length})).sort((a, b) => b.n - a.n);
+    const mx = Math.max(1, rk[0].n);
+    duel = `<div class="duel card"><h3><span>Duelo de la mesa</span><span>${S.session.log.length} piezas</span></h3>
+      ${rk.map((o, i) => `<div class="dl"><span class="dl-pos${i === 0 && o.n ? ' p1' : ''}">${i+1}</span><span class="av md" style="--c:${o.x.color}">${esc(initial(o.x.name))}</span>
+      <span class="dl-main"><span class="dl-name">${esc(o.x.name)}</span><span class="dl-bar" style="--c:${o.x.color}"><i style="width:${o.n/mx*100}%"></i></span></span><span class="dl-n">${o.n}</span></div>`).join('')}</div>`;
+  }
+  $('#chBody').innerHTML = `
+    <div class="lt-wrap"><h1 class="lt">Desafíos</h1><p class="lt-sub">${d.name.toLowerCase() === 'tú' ? 'Tu progreso' : 'Progreso de ' + esc(d.name)} en esta sesión</p></div>
+    <div class="sum card"><div class="sum-n">${done.length}<span>/${rows.length}</span></div><div class="sum-t">desafíos completados</div>
+      <div class="meter anim"><i style="width:${rows.length ? done.length/rows.length*100 : 0}%"></i></div>
+      ${done.length ? `<div class="sum-medals">${done.map(x => medal(x.ch, false)).join('')}</div>` : ''}</div>
+    ${duel}
+    ${todo.length ? `<div class="gsec"><div class="glabel">En curso</div><div class="group">${todo.map(row).join('')}</div></div>` : ''}
+    ${done.length ? `<div class="gsec"><div class="glabel">Completados</div><div class="group">${done.map(row).join('')}</div></div>` : ''}
+    <div class="gsec"><div class="group"><button class="row accent" id="newCh2">${ui('plus')}<span class="row-l">Crear desafío personalizado</span></button></div>
+    <p class="gfoot">Los desafíos se reinician en cada sesión. El contador ×N guarda las veces que lo has conseguido.</p></div>`;
+  $('#newCh2 svg').style.cssText = 'width:20px;height:20px';
+}
+function updateBadge() {
+  const tb = $('.tb[data-tab="ch"]'); let b = tb.querySelector('.badge');
+  if (unseen > 0 && cur !== 'ch') { if (!b) { b = document.createElement('span'); b.className = 'badge'; tb.appendChild(b); } b.textContent = unseen; }
+  else if (b) b.remove();
+}
+function chSheet(chId) {
+  const ch = chById(chId); if (!ch) return;
+  const id = S.active, r = evalCh(ch, id), done = isDone(id, ch.id), n = S.trophies[ch.id] || 0;
+  const tierName = {bronze:'Bronce', silver:'Plata', gold:'Oro', accent:'Personalizado'}[ch.tier];
+  openSheet({title:'Desafío', cancel:'Cerrar', body:`
+    <div class="sh-hero">${medal(ch, !done)}<h4>${esc(ch.t)}</h4><p>${esc(chDesc(ch))}</p></div>
+    <div class="kv"><div><span>Nivel</span><b>${tierName}</b></div><div><span>Conseguido</span><b class="num">${n} ${n === 1 ? 'vez' : 'veces'}</b></div></div>
+    <div class="group pad" style="display:flex;flex-direction:column;gap:8px"><div class="row-t">${done ? 'Completado en esta sesión' : 'Progreso de ' + esc(diner(id).name)}</div>
+      <div class="meter${done ? ' ok' : ''} anim"><i style="width:${done ? 100 : r.p*100}%"></i></div><div class="row-p">${esc(r.txt)}</div></div>
+    ${ch.custom ? `<button class="btn ghost" id="delCh">Eliminar desafío</button>` : ''}`,
+    mount(el) {
+      const b = $('#delCh', el);
+      if (b) twoStep(b, 'Toca otra vez para eliminar', () => { S.custom = S.custom.filter(c => c.id !== ch.id); save(); closeSheet(); renderChallenges(); updateCounter(); hud('Desafío eliminado'); });
+    }});
+}
+function newChSheet() {
+  let kind = 'all', n = 30, mins = 0;
+  const label = () => `${n} ${kind === 'all' ? 'piezas' : typeById(kind).name.toLowerCase()}${mins ? ` en ${mins} min` : ''}`;
+  openSheet({title:'Nuevo desafío', ok:'Crear', body:`
+    <div class="sh-hero" id="ncPrev"></div>
+    <div class="gsec"><div class="glabel">Nombre</div><div class="group"><label class="row"><input class="row-in" id="ncName" style="text-align:left" maxlength="28" placeholder="Opcional"></label></div></div>
+    <div class="gsec"><div class="glabel">Pieza</div><div class="picks" id="ncKind">
+      <button class="pick on" data-k="all"><svg viewBox="0 0 24 24" class="mono" style="width:38px;height:38px;padding:6px">${GLYPH.star.replace('#fff','currentColor').replace('fill-opacity=".25"','fill-opacity=".15"')}</svg>Todas</button>
+      ${S.types.map(t => `<button class="pick" data-k="${t.id}">${icon(t.id)}${esc(t.name)}</button>`).join('')}</div></div>
+    <div class="gsec"><div class="glabel">Reto</div><div class="group">
+      <div class="row"><span class="row-l">Objetivo</span><span class="row-v num" id="ncN"></span>${stepper('nc-n')}</div>
+      <div class="row"><span class="row-l">Tiempo límite</span><span class="row-v num" id="ncM"></span>${stepper('nc-m')}</div></div>
+      <p class="gfoot">Con tiempo límite cuenta tu mejor tramo: por ejemplo, 8 piezas en 3 minutos seguidos.</p></div>`,
+    mount(el) {
+      const paint = () => {
+        $('#ncN', el).textContent = n; $('#ncM', el).textContent = mins ? `${mins} min` : 'Sin límite';
+        const def = customDef({id:'x', kind, n, mins, name:$('#ncName', el).value.trim()});
+        $('#ncPrev', el).innerHTML = `${medal(def, false)}<h4>${esc(def.t)}</h4><p>${esc(label())}</p>`;
+      };
+      $('#ncKind', el).addEventListener('click', e => { const b = e.target.closest('.pick'); if (!b) return; $$('.pick', el).forEach(p => p.classList.toggle('on', p === b)); kind = b.dataset.k; paint(); });
+      $('#ncName', el).addEventListener('input', paint);
+      bindStepper(el, 'nc-n', dir => { n = Math.max(1, Math.min(500, n + dir * (n >= 50 ? 5 : 1))); paint(); });
+      bindStepper(el, 'nc-m', dir => { mins = Math.max(0, Math.min(180, mins + dir * ((dir > 0 ? mins >= 10 : mins > 10) ? 5 : 1))); paint(); });
+      paint();
+    },
+    onOk(el) {
+      S.custom.push({id:'u' + Date.now().toString(36), kind, n, mins, name:$('#ncName', el).value.trim()});
+      save(); renderChallenges(); updateCounter(); hud('Desafío creado'); checkUnlocks(S.active);
+    }});
+}
+
+/* =========================================================
+   HISTORIAL
+   ========================================================= */
+const MONTHS = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const sTotal = s => s.diners.reduce((a, d) => a + sum(d.counts), 0);
+function niceStep(x) { const p = 10 ** Math.floor(Math.log10(x || 1)), m = x / p; return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 5 ? 5 : 10) * p; }
+function chart(list) {
+  const L = list.slice(-8); if (L.length < 2) return '';
+  const W = 330, H = 176, l = 30, r = 6, t = 18, b = 24, pw = W - l - r, ph = H - t - b;
+  const vals = L.map(sTotal), max = Math.max(...vals, 1), step = niceStep(max / 3), top = Math.ceil(max / step) * step;
+  let g = '';
+  for (let v = 0; v <= top; v += step) { const y = t + ph - v / top * ph; g += `<line class="gl" x1="${l}" x2="${W - r}" y1="${y}" y2="${y}"/><text class="tx" x="${l - 6}" y="${y + 3.5}" text-anchor="end">${v}</text>`; }
+  const slot = pw / L.length, bw = Math.min(30, slot * .58);
+  L.forEach((s, i) => {
+    const v = vals[i], h = Math.max(2, v / top * ph), x = l + i * slot + (slot - bw) / 2, y = t + ph - h, dt = new Date(s.date);
+    g += `<rect class="bar${i === L.length - 1 ? ' cur' : ''}" x="${x}" y="${y}" width="${bw}" height="${h}" rx="6" style="animation-delay:${i * 60}ms"/>
+      <text class="tv" x="${x + bw / 2}" y="${y - 5}" text-anchor="middle">${v}</text>
+      <text class="tx" x="${x + bw / 2}" y="${H - 6}" text-anchor="middle">${dt.getDate()} ${MONTHS[dt.getMonth()]}</text>`;
+  });
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Piezas por sesión">${g}</svg>`;
+}
+function renderHistory() {
+  const H = [...S.history].sort((a, b) => a.date - b.date);
+  const tots = H.map(sTotal);
+  const best = tots.length ? Math.max(...tots) : 0, all = tots.reduce((a, b) => a + b, 0);
+  const hasEx = H.some(s => s.ex);
+  $('#histBody').innerHTML = `
+    <div class="lt-wrap"><h1 class="lt">Historial</h1><p class="lt-sub">${H.length ? `${H.length} ${H.length === 1 ? 'sesión guardada' : 'sesiones guardadas'}` : 'Aún no hay sesiones'}</p></div>
+    ${H.length ? `
+    <div class="tiles"><div class="tile"><b>${H.length}</b><span>Sesiones</span></div><div class="tile"><b>${all}</b><span>Piezas</span></div>
+      <div class="tile"><b>${best}</b><span>Récord</span></div><div class="tile"><b>${Math.round(all / H.length)}</b><span>Media</span></div></div>
+    ${H.length > 1 ? `<div class="chart-card card"><h3><span>Piezas por sesión</span><span>mesa</span></h3>${chart(H)}</div>` : ''}
+    <div class="gsec"><div class="glabel">Sesiones</div><div class="group">
+      ${[...H].reverse().map(s => { const dt = new Date(s.date); return `<button class="row h-row" data-h="${s.id}">
+        <span class="h-date"><b>${dt.getDate()}</b><span>${MONTHS[dt.getMonth()]}</span></span>
+        <span class="row-main"><span class="row-t">${esc(s.buffet)}${s.ex ? '<em class="tag">Ejemplo</em>' : ''}</span>
+        <span class="row-d" style="display:flex;align-items:center;gap:8px"><span class="h-av">${s.diners.map(d => `<span class="av" style="--c:${d.color}">${esc(initial(d.name))}</span>`).join('')}</span>${durShort(s.dur)}</span></span>
+        <span class="h-tot">${sTotal(s)}</span>${ui('chev','chev')}</button>`; }).join('')}
+    </div>${hasEx ? '<p class="gfoot">Las sesiones marcadas como ejemplo son de muestra. Puedes borrarlas en Ajustes › Datos.</p>' : ''}</div>`
+    : `<div class="card empty">${icon('maki').replace('<svg', '<svg style="width:92px;height:92px"')}<b>Sin sesiones todavía</b>Cuando termines una comida pulsa «Terminar» en el contador y se guardará aquí.</div>`}`;
+}
+function histSheet(hid) {
+  const s = S.history.find(x => x.id === hid); if (!s) return;
+  const tot = sTotal(s), dt = new Date(s.date), n = s.diners.length;
+  const allC = {}; s.diners.forEach(d => Object.entries(d.counts).forEach(([k, v]) => allC[k] = (allC[k] || 0) + v));
+  const top = Object.entries(allC).sort((a, b) => b[1] - a[1])[0];
+  openSheet({title:dt.toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}), cancel:'Cerrar', body:`
+    <div class="sh-hero"><div class="big">${tot}</div><p>piezas en ${esc(s.buffet)}${s.ex ? ' · ejemplo' : ''}</p></div>
+    <div class="kv"><div><span>Duración</span><b>${durShort(s.dur)}</b></div><div><span>Por pieza</span><b>${tot ? money(s.price * n / tot) : '—'}</b></div>
+      <div><span>Precio</span><b>${money(s.price)}</b></div><div><span>Favorita</span><b>${top ? icon(top[0]) + esc(typeById(top[0])?.name || top[0]) : '—'}</b></div></div>
+    ${s.diners.map(d => `<div class="gsec"><div class="glabel" style="display:flex;gap:8px;align-items:center"><span class="av" style="--c:${d.color};width:20px;height:20px;font-size:10px">${esc(initial(d.name))}</span>${esc(d.name)} · ${sum(d.counts)} piezas · ${nf0(kcalOf(d.counts))} kcal</div>
+      <div class="group pad"><div class="mini-grid">${Object.entries(d.counts).filter(([, v]) => v).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<div class="mini">${icon(k)}<b>${v}</b>${esc(typeById(k)?.name || k)}</div>`).join('')}</div>
+      ${(d.medals || []).length ? `<div class="sum-medals" style="margin-top:12px">${d.medals.map(m => chById(m)).filter(Boolean).map(m => medal(m, false)).join('')}</div>` : ''}</div></div>`).join('')}
+    <button class="btn ghost" id="delH">Eliminar sesión</button>`,
+    mount(el) { twoStep($('#delH', el), 'Toca otra vez para eliminar', () => { S.history = S.history.filter(x => x.id !== hid); save(); closeSheet(); renderHistory(); hud('Sesión eliminada'); }); }});
+}
+
+/* =========================================================
+   TERMINAR SESIÓN
+   ========================================================= */
+function finishSheet() {
+  if (!S.session.log.length) return;
+  const ms = Date.now() - S.session.start, tot = S.session.log.length, all = counts();
+  const top = Object.entries(all).sort((a, b) => b[1] - a[1])[0];
+  const people = S.diners.map(d => ({d, n:S.session.log.filter(e => e.d === d.id).length, m:S.session.done[d.id] || []})).filter(x => x.n).sort((a, b) => b.n - a.n);
+  openSheet({title:'Resumen', body:`
+    <div class="sh-hero"><div class="big" id="finBig"></div><p>piezas en la mesa · ${durShort(ms)}</p></div>
+    <div class="kv"><div><span>Por pieza</span><b>${money(S.settings.price * people.length / tot)}</b></div><div><span>Favorita</span><b>${icon(top[0])}${esc(typeById(top[0])?.name || '')}</b></div>
+      <div><span>Kcal mesa</span><b>${nf0(kcalOf(all))}</b></div><div><span>Medallas</span><b>${people.reduce((a, x) => a + x.m.length, 0)}</b></div></div>
+    <div class="gsec"><div class="glabel">Comensales</div><div class="group">${people.map((x, i) => `<div class="row" style="--ins:62px;padding:10px 16px">
+      <span class="av md" style="--c:${x.d.color}">${esc(initial(x.d.name))}</span><span class="row-main"><span class="row-t">${esc(x.d.name)}${i === 0 && people.length > 1 ? '<em class="tag">Gana</em>' : ''}</span>
+      <span class="row-d">${x.m.length} ${x.m.length === 1 ? 'medalla' : 'medallas'} · ${nf0(kcalOf(counts(x.d.id)))} kcal</span></span><span class="h-tot">${x.n}</span></div>`).join('')}</div></div>
+    <button class="btn" id="finSave">Guardar en el historial</button>
+    <button class="btn ghost" id="finDrop">Descartar sesión</button>`,
+    mount(el) {
+      const o = new Odo($('#finBig', el)); o.set(0); setTimeout(() => o.set(tot), 120);
+      $('#finSave', el).onclick = () => {
+        const rec = {id:'s' + Date.now().toString(36), date:S.session.start, buffet:S.settings.buffet, price:S.settings.price, carta:S.settings.carta, dur:ms,
+          diners:people.map(x => ({name:x.d.name, color:x.d.color, counts:counts(x.d.id), medals:[...x.m]}))};
+        S.history.push(rec);
+        people.forEach(x => x.m.forEach(m => S.trophies[m] = (S.trophies[m] || 0) + 1));
+        resetSession(); closeSheet(); hud('Sesión guardada'); confetti(110);
+      };
+      twoStep($('#finDrop', el), 'Toca otra vez para descartar', () => { resetSession(); closeSheet(); hud('Sesión descartada'); });
+    }});
+}
+function resetSession() { S.session = {start:null, log:[], done:{}}; unseen = 0; updateBadge(); save(); renderChips(); updateCounter(); }
+
+/* =========================================================
+   COMENSALES / TIPOS (hojas)
+   ========================================================= */
+function dinerSheet(id) {
+  const d = id ? diner(id) : null;
+  let color = d ? d.color : (DINER_COLORS.find(c => !S.diners.some(x => x.color === c)) || DINER_COLORS[S.diners.length % DINER_COLORS.length]);
+  openSheet({title:d ? 'Editar comensal' : 'Nuevo comensal', ok:d ? 'Guardar' : 'Añadir', body:`
+    <div class="sh-hero"><span class="av xl" id="dnAv" style="--c:${color}">${esc(d ? initial(d.name) : '?')}</span></div>
+    <div class="group"><label class="row"><span class="row-l" style="flex:0 0 auto">Nombre</span><input class="row-in" id="dnName" maxlength="16" placeholder="Por ejemplo, Lucía" value="${d ? esc(d.name) : ''}" autocomplete="off"></label></div>
+    <div class="gsec"><div class="glabel">Color</div><div class="group pad"><div class="swatches" id="dnCol">${DINER_COLORS.map(c => `<button class="swc${c === color ? ' on' : ''}" data-c="${c}" style="--c:${c}" aria-label="Color ${c}"></button>`).join('')}</div></div></div>
+    ${d && S.diners.length > 1 ? `<button class="btn ghost" id="dnDel">Eliminar comensal</button><p class="gfoot" style="margin-top:-4px">Se borrarán sus piezas de la sesión actual.</p>` : ''}`,
+    mount(el) {
+      const av = $('#dnAv', el), inp = $('#dnName', el);
+      inp.addEventListener('input', () => av.textContent = initial(inp.value) );
+      $('#dnCol', el).addEventListener('click', e => { const b = e.target.closest('.swc'); if (!b) return; color = b.dataset.c; $$('.swc', el).forEach(x => x.classList.toggle('on', x === b)); av.style.setProperty('--c', color); });
+      const del = $('#dnDel', el);
+      if (del) twoStep(del, 'Toca otra vez para eliminar', () => {
+        S.session.log = S.session.log.filter(e => e.d !== id); delete S.session.done[id];
+        S.diners = S.diners.filter(x => x.id !== id); if (S.active === id) S.active = S.diners[0].id;
+        if (!S.session.log.length) S.session.start = null;
+        save(); closeSheet(); refreshAll();
+      });
+      if (!d) setTimeout(() => inp.focus(), 450);
+    },
+    onOk(el) {
+      const name = $('#dnName', el).value.trim() || `Comensal ${S.diners.length + (d ? 0 : 1)}`;
+      if (d) { d.name = name; d.color = color; }
+      else { const nd = {id:'d' + Date.now().toString(36), name, color}; S.diners.push(nd); S.active = nd.id; }
+      save(); refreshAll();
+    }});
+}
+function typeSheet(k) {
+  const t = typeById(k), def = DEFAULT_TYPES.find(x => x.id === k);
+  let kcal = t.kcal;
+  openSheet({title:'Pieza', ok:'Guardar', body:`
+    <div class="sh-hero">${icon(k).replace('<svg', '<svg style="width:110px;height:110px"')}</div>
+    <div class="group">
+      <label class="row"><span class="row-l" style="flex:0 0 auto">Nombre</span><input class="row-in" id="tpName" maxlength="16" value="${esc(t.name)}" autocomplete="off"></label>
+      <div class="row"><span class="row-l">Calorías por pieza</span><span class="row-v num" id="tpK"></span>${stepper('tp-k')}</div>
+      <div class="row"><span class="row-l">Mostrar en el contador</span><label class="sw"><input type="checkbox" id="tpOn" ${t.on ? 'checked' : ''}><span></span></label></div>
+    </div>
+    <div class="group"><button class="row accent" id="tpReset" style="justify-content:center">Restaurar valores (${esc(def.name)}, ${def.kcal} kcal)</button></div>`,
+    mount(el) {
+      const paint = () => $('#tpK', el).textContent = `${kcal} kcal`;
+      bindStepper(el, 'tp-k', dir => { kcal = Math.max(0, Math.min(800, kcal + dir * 5)); paint(); });
+      $('#tpReset', el).onclick = () => { $('#tpName', el).value = def.name; kcal = def.kcal; paint(); };
+      paint();
+    },
+    onOk(el) { t.name = $('#tpName', el).value.trim() || def.name; t.kcal = kcal; t.on = $('#tpOn', el).checked; save(); buildGrid(); renderSettings(); }});
+}
+
+/* =========================================================
+   AJUSTES
+   ========================================================= */
+const stepper = id => `<div class="stepper" data-stepper="${id}"><button data-dir="-1" aria-label="Menos">${ui('minus')}</button><i></i><button data-dir="1" aria-label="Más">${ui('plus')}</button></div>`;
+function bindStepper(root, id, fn) {
+  const box = root.querySelector(`[data-stepper="${id}"]`); if (!box) return;
+  box.querySelectorAll('button').forEach(b => {
+    let t1, t2;
+    const stop = () => { clearTimeout(t1); clearInterval(t2); };
+    b.addEventListener('pointerdown', e => {
+      e.preventDefault(); const dir = +b.dataset.dir; fn(dir); feedback('tick');
+      t1 = setTimeout(() => { t2 = setInterval(() => fn(dir), 70); }, 420);
+    });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => b.addEventListener(ev, stop));
+    b.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(+b.dataset.dir); } });
+  });
+}
+const seg = (key, opts) => {
+  const i = Math.max(0, opts.findIndex(o => o[0] === S.settings[key]));
+  return `<div class="seg" data-seg="${key}" style="--n:${opts.length};--i:${i}"><span class="seg-th"></span>${opts.map(([v, l]) => `<button data-v="${v}" aria-pressed="${v === S.settings[key]}">${l}</button>`).join('')}</div>`;
+};
+function renderSettings() {
+  const st = S.settings, ac = ACCENTS.find(a => a.id === st.accent) || ACCENTS[0];
+  const hasEx = S.history.some(h => h.ex);
+  $('#setBody').innerHTML = `
+    <div class="lt-wrap"><h1 class="lt">Ajustes</h1></div>
+    <div class="gsec"><div class="glabel">Buffet</div><div class="group">
+      <label class="row"><span class="row-l" style="flex:0 0 auto">Nombre</span><input class="row-in" id="inBuffet" maxlength="28" value="${esc(st.buffet)}" autocomplete="off"></label>
+      <label class="row"><span class="row-l" style="flex:0 0 auto">Precio por persona</span><input class="row-in num" id="inPrice" inputmode="decimal" value="${fmtDec(st.price)}"><span class="row-v">${CURRENCIES[st.cur]}</span></label>
+      <label class="row"><span class="row-l" style="flex:0 0 auto">Pieza a la carta</span><input class="row-in num" id="inCarta" inputmode="decimal" value="${fmtDec(st.carta)}"><span class="row-v">${CURRENCIES[st.cur]}</span></label>
+      <div class="row">${seg('cur', [['EUR', 'Euro €'], ['USD', 'Dólar $'], ['GBP', 'Libra £']])}</div>
+    </div><p class="gfoot">El precio medio de una pieza a la carta sirve para calcular cuándo amortizas el buffet.</p></div>
+
+    <div class="gsec"><div class="glabel">Objetivo</div><div class="group">
+      <div class="row"><span class="row-l">Piezas por persona</span><span class="row-v num" id="goalV">${st.goal}</span>${stepper('goal')}</div>
+    </div></div>
+
+    <div class="gsec"><div class="glabel">Comensales</div><div class="group">
+      ${S.diners.map(d => `<button class="row" style="--ins:62px" data-diner="${d.id}"><span class="av md" style="--c:${d.color}">${esc(initial(d.name))}</span><span class="row-l">${esc(d.name)}</span>${ui('chev','chev')}</button>`).join('')}
+      <button class="row accent" id="addDiner2" style="--ins:62px"><span style="width:34px;display:grid;place-items:center">${ui('plus').replace('<svg', '<svg style="width:22px;height:22px"')}</span><span class="row-l">Añadir comensal</span></button>
+    </div><p class="gfoot">Mantén pulsado un comensal en el contador para editarlo.</p></div>
+
+    <div class="gsec"><div class="glabel">Piezas</div><div class="group">
+      ${S.types.map(t => `<div class="row tap" style="--ins:62px;cursor:pointer" data-type="${t.id}" tabindex="0" role="button"><span class="ricon">${icon(t.id)}</span><span class="row-l">${esc(t.name)}<span class="sub">${t.kcal} kcal por pieza</span></span>
+        <label class="sw" aria-label="Mostrar ${esc(t.name)}"><input type="checkbox" data-ton="${t.id}" ${t.on ? 'checked' : ''}><span></span></label></div>`).join('')}
+    </div><p class="gfoot">Toca una pieza para cambiar su nombre o sus calorías.</p></div>
+
+    <div class="gsec"><div class="glabel">Apariencia</div><div class="group">
+      <div class="row">${seg('theme', [['system', 'Sistema'], ['light', 'Claro'], ['dark', 'Oscuro']])}</div>
+      <div class="row">${seg('layout', [['grid', 'Cuadrícula'], ['list', 'Lista']])}</div>
+      <div class="row" style="flex-direction:column;align-items:stretch;gap:12px;padding:14px 16px">
+        <div style="display:flex;justify-content:space-between"><span>Color de acento</span><span class="row-v" id="acName">${ac.name} · ${ac.m}</span></div>
+        <div class="swatches" id="acSw">${ACCENTS.map(a => `<button class="swc${a.id === st.accent ? ' on' : ''}" data-ac="${a.id}" style="--c:${a.c}" aria-label="${a.name}"></button>`).join('')}</div>
+      </div>
+    </div></div>
+
+    <div class="gsec"><div class="glabel">Respuesta</div><div class="group">
+      <div class="row"><span class="row-l">Sonidos</span><label class="sw"><input type="checkbox" id="inSound" ${st.sound ? 'checked' : ''}><span></span></label></div>
+      <div class="row"><span class="row-l">Vibración</span><label class="sw"><input type="checkbox" id="inHap" ${st.haptics ? 'checked' : ''}><span></span></label></div>
+    </div><p class="gfoot">Safari en iPhone no permite que las webs vibren; en Android sí funciona.</p></div>
+
+    <div class="gsec"><div class="glabel">Datos</div><div class="group">
+      ${hasEx ? '<button class="row accent" id="delEx" style="justify-content:center">Quitar sesiones de ejemplo</button>' : ''}
+      <button class="row danger" id="delHist">Borrar historial</button>
+      <button class="row danger" id="resetAll">Restablecer todo</button>
+    </div><p class="gfoot">Todo se guarda solo en este dispositivo.</p></div>`;
+  wireSettings();
+}
+function wireSettings() {
+  const root = $('#setBody'), st = S.settings;
+  $('#inBuffet').addEventListener('input', e => { st.buffet = e.target.value.trim() || 'Buffet libre'; save(); updateCounter(); });
+  $('#inPrice').addEventListener('change', e => { st.price = Math.max(0, parseNum(e.target.value)); e.target.value = fmtDec(st.price); save(); updateCounter(); });
+  $('#inCarta').addEventListener('change', e => { st.carta = Math.max(0, parseNum(e.target.value)); e.target.value = fmtDec(st.carta); save(); updateCounter(); });
+  $$('.seg', root).forEach(sg => sg.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    const key = sg.dataset.seg, btns = $$('button', sg);
+    st[key] = b.dataset.v; sg.style.setProperty('--i', btns.indexOf(b)); btns.forEach(x => x.setAttribute('aria-pressed', x === b));
+    save(); feedback('tick');
+    if (key === 'theme') applyLook();
+    if (key === 'layout') buildGrid();
+    if (key === 'cur') { updateCounter(); $$('.row-v', root).forEach(v => { if (/^[€$£]$/.test(v.textContent)) v.textContent = CURRENCIES[st.cur]; }); }
+  }));
+  bindStepper(root, 'goal', dir => { st.goal = Math.max(5, Math.min(400, st.goal + dir * 5)); $('#goalV').textContent = st.goal; save(); updateCounter(); });
+  root.addEventListener('click', e => {
+    const dn = e.target.closest('[data-diner]'); if (dn) return dinerSheet(dn.dataset.diner);
+    if (e.target.closest('#addDiner2')) return dinerSheet();
+    const sw = e.target.closest('.sw'); if (sw) return;
+    const tp = e.target.closest('[data-type]'); if (tp) return typeSheet(tp.dataset.type);
+    const a = e.target.closest('[data-ac]');
+    if (a) { st.accent = a.dataset.ac; applyLook(); save(); feedback('tick'); $$('[data-ac]', root).forEach(x => x.classList.toggle('on', x === a)); const ac = ACCENTS.find(x => x.id === st.accent); $('#acName').textContent = `${ac.name} · ${ac.m}`; updateCounter(); }
+  });
+  root.addEventListener('keydown', e => { const tp = e.target.closest('[data-type]'); if (tp && e.target === tp && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); typeSheet(tp.dataset.type); } });
+  root.addEventListener('change', e => {
+    const t = e.target;
+    if (t.dataset.ton) { typeById(t.dataset.ton).on = t.checked; save(); buildGrid(); feedback('tick'); }
+    if (t.id === 'inSound') { st.sound = t.checked; save(); feedback('tick'); }
+    if (t.id === 'inHap') { st.haptics = t.checked; save(); feedback('tick'); }
+  });
+  const ex = $('#delEx'); if (ex) ex.onclick = () => { S.history = S.history.filter(h => !h.ex); save(); renderSettings(); hud('Ejemplos eliminados'); };
+  twoStep($('#delHist'), 'Toca otra vez para borrar', () => { S.history = []; S.trophies = {}; save(); renderSettings(); hud('Historial borrado'); });
+  twoStep($('#resetAll'), 'Toca otra vez para restablecer', () => { S = fresh(); S.history = []; applyLook(); save(); refreshAll(); renderSettings(); hud('Todo restablecido'); });
+}
+function twoStep(btn, label, fn) {
+  let armed = false, t;
+  const old = btn.textContent;
+  btn.addEventListener('click', () => {
+    if (armed) { clearTimeout(t); fn(); return; }
+    armed = true; btn.textContent = label; btn.classList.add('armed'); feedback('tick');
+    t = setTimeout(() => { armed = false; btn.textContent = old; btn.classList.remove('armed'); }, 3000);
+  });
+}
+
+/* =========================================================
+   HOJA MODAL
+   ========================================================= */
+let sheetOpen = null, sheetCloseT;
+function openSheet(o) {
+  const sh = $('#sheet'), bd = $('#backdrop');
+  clearTimeout(sheetCloseT);
+  sh.innerHTML = `<div class="sh-grab" aria-hidden="true"></div><div class="sh-head"><button class="nb" data-x>${o.cancel || 'Cancelar'}</button><h3>${esc(o.title)}</h3>${o.ok ? `<button class="nb b" data-ok>${o.ok}</button>` : '<span></span>'}</div><div class="sh-body">${o.body}</div>`;
+  sh.setAttribute('aria-label', o.title);
+  sh.style.transform = ''; sh.scrollTop = 0;
+  sh.hidden = false; bd.hidden = false; void sh.offsetHeight;
+  document.body.classList.add('sheet-open');
+  sheetOpen = o;
+  $('[data-x]', sh).onclick = closeSheet;
+  const ok = $('[data-ok]', sh); if (ok) ok.onclick = () => { if (o.onOk && o.onOk(sh) === false) return; closeSheet(); };
+  o.mount && o.mount(sh);
+}
+function closeSheet() {
+  const sh = $('#sheet');
+  document.body.classList.remove('sheet-open'); sh.style.transform = ''; sheetOpen = null;
+  sheetCloseT = setTimeout(() => { sh.hidden = true; $('#backdrop').hidden = true; sh.innerHTML = ''; }, 480);
+}
+(function dragToDismiss() {
+  const sh = $('#sheet'); let y0 = null, dy = 0, t0 = 0;
+  sh.addEventListener('pointerdown', e => {
+    if (!e.target.closest('.sh-head') || e.target.closest('button')) return;
+    y0 = e.clientY; dy = 0; t0 = performance.now(); sh.style.transition = 'none'; sh.setPointerCapture(e.pointerId);
+  });
+  sh.addEventListener('pointermove', e => {
+    if (y0 === null) return;
+    dy = e.clientY - y0; sh.style.transform = `translateY(${dy > 0 ? dy : dy / 6}px)`;
+  });
+  const end = () => {
+    if (y0 === null) return;
+    sh.style.transition = ''; const v = dy / Math.max(1, performance.now() - t0);
+    y0 = null;
+    if (dy > 120 || v > .6) closeSheet(); else sh.style.transform = '';
+  };
+  sh.addEventListener('pointerup', end); sh.addEventListener('pointercancel', end);
+  $('#backdrop').addEventListener('click', closeSheet);
+  addEventListener('keydown', e => { if (e.key === 'Escape' && sheetOpen) closeSheet(); });
+})();
+
+/* =========================================================
+   NAVEGACIÓN
+   ========================================================= */
+let cur = 'count';
+const TABS = {count:['tCount', 'Contador'], ch:['tCh', 'Desafíos'], hist:['tHist', 'Historial'], set:['tSet', 'Ajustes']};
+$$('.tb').forEach(b => { const [ic, l] = TABS[b.dataset.tab]; b.innerHTML = `${ui(ic)}<span>${l}</span>`; });
+function go(tab) {
+  const v = $('#v-' + tab);
+  if (tab === cur) { v.scrollTo({top:0, behavior:RM.matches ? 'auto' : 'smooth'}); return; }
+  cur = tab;
+  $$('.view').forEach(x => { x.hidden = x !== v; });
+  $$('.tb').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === tab));
+  if (tab === 'ch') { renderChallenges(); unseen = 0; }
+  if (tab === 'hist') renderHistory();
+  if (tab === 'set') renderSettings();
+  updateBadge();
+  v.classList.remove('enter'); void v.offsetWidth; v.classList.add('enter');
+  onScroll.call(v);
+}
+function onScroll() { this.querySelector('.nav').classList.toggle('scrolled', this.scrollTop > 34); }
+$$('.view').forEach(v => v.addEventListener('scroll', onScroll, {passive:true}));
+$('.tabbar').addEventListener('click', e => { const b = e.target.closest('.tb'); if (b) { go(b.dataset.tab); feedback('tick'); } });
+
+function refreshAll() {
+  renderChips(); updateCounter();
+  if (cur === 'ch') renderChallenges();
+  if (cur === 'hist') renderHistory();
+  if (cur === 'set') renderSettings();
+}
+
+/* =========================================================
+   EVENTOS DEL CONTADOR
+   ========================================================= */
+$('#btnUndo').innerHTML = ui('undo');
+$('#btnNewCh').innerHTML = ui('plus');
+$('#btnUndo').onclick = undo;
+$('#btnFinish').onclick = finishSheet;
+$('#btnNewCh').onclick = newChSheet;
+$('#nextCh').onclick = () => go('ch');
+$('#ringBtn').onclick = () => {
+  if (S.diners.length < 2) { hud('Añade comensales para ver el total de la mesa'); return; }
+  ringMode = ringMode === 'me' ? 'table' : 'me'; feedback('tick'); updateCounter();
+};
+$('#grid').addEventListener('click', e => {
+  const m = e.target.closest('.pc-minus');
+  if (m) { e.stopPropagation(); removeOne(m.closest('.pc').dataset.k); return; }
+  const c = e.target.closest('.pc'); if (c) add(c.dataset.k, e);
+});
+$('#grid').addEventListener('keydown', e => {
+  const c = e.target.closest('.pc'); if (!c || e.target !== c) return;
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); add(c.dataset.k); }
+  if (e.key === 'Backspace' || e.key === '-') { e.preventDefault(); removeOne(c.dataset.k); }
+});
+(function chipEvents() {
+  const box = $('#chips'); let lp, fired = false;
+  box.addEventListener('pointerdown', e => {
+    const c = e.target.closest('.chip[data-id]'); if (!c) return;
+    fired = false; lp = setTimeout(() => { fired = true; feedback('tick'); dinerSheet(c.dataset.id); }, 520);
+  });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => box.addEventListener(ev, () => clearTimeout(lp)));
+  box.addEventListener('scroll', () => clearTimeout(lp), {passive:true});
+  box.addEventListener('contextmenu', e => e.preventDefault());
+  box.addEventListener('click', e => {
+    if (fired) { fired = false; return; }
+    if (e.target.closest('#addDiner')) return dinerSheet();
+    const c = e.target.closest('.chip[data-id]'); if (!c || c.dataset.id === S.active) return;
+    S.active = c.dataset.id; save(); feedback('tick');
+    $$('.chip[data-id]', box).forEach(x => { const on = x === c; x.classList.toggle('on', on); x.setAttribute('aria-selected', on); });
+    updateCounter();
+  });
+})();
+document.addEventListener('touchstart', () => {}, {passive:true});
+
+/* =========================================================
+   ARRANQUE
+   ========================================================= */
+applyLook();
+ODO.ring = new Odo($('#ringN'));
+$('#ringBar').style.strokeDasharray = RC;
+$('#ringBar').style.strokeDashoffset = RC;
+renderChips();
+buildGrid();
+let tickN = 0;
+setInterval(() => {
+  if (!S.session.start) return;
+  updateTime();
+  if (++tickN % 15 === 0) { S.diners.forEach(d => checkUnlocks(d.id)); updateCounter(); }
+}, 1000);
+})();
+</script>
+<!--ARTIFACT-BODY-END-->
+</body>
+</html>
