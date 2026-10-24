@@ -1,0 +1,16 @@
+{
+  "name": "Contador de Sushi",
+  "short_name": "Sushi",
+  "description": "Cuenta lo que comes en el buffet: coste real, misiones, desafíos y logros.",
+  "lang": "es",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F2F2F7",
+  "theme_color": "#FA5D3C",
+  "icons": [
+    {"src": "apple-touch-icon.png", "sizes": "180x180", "type": "image/png"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+  ]
+}

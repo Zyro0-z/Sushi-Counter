@@ -10,6 +10,7 @@
 <meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
 <!--ARTIFACT-START-->
 <title>Contador de Sushi</title>
 <meta name="claude:viewport-fit-sides" content="cover">
@@ -703,6 +704,7 @@ const UI = {
   flame:'<path d="M12 21c-3.9 0-6.4-2.7-6.4-6.2 0-3.3 2.4-5 3.5-8 1.5 1.6 2 3 2 4.6 1.2-1 2.6-3.4 2.3-6.4 3.4 2.2 5.2 5.9 5.2 9.8 0 3.5-2.6 6.2-6.6 6.2z"/>',
   dice:'<rect x="4" y="4" width="16" height="16" rx="4"/><circle cx="9" cy="9" r="1" fill="currentColor"/><circle cx="15" cy="15" r="1" fill="currentColor"/><circle cx="15" cy="9" r="1" fill="currentColor"/><circle cx="9" cy="15" r="1" fill="currentColor"/>',
   info:'<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.8v.2"/>',
+  share:'<path d="M12 3.5v11M8 7.5l4-4 4 4"/><path d="M8 10.5H6.5a1.5 1.5 0 0 0-1.5 1.5v7a1.5 1.5 0 0 0 1.5 1.5h11a1.5 1.5 0 0 0 1.5-1.5v-7a1.5 1.5 0 0 0-1.5-1.5H16"/>',
   tCount:'<circle class="fillsel" cx="10.5" cy="14" r="7.5"/><circle cx="10.5" cy="14" r="7.5"/><circle cx="10.5" cy="14" r="3.4"/><path d="M15.5 2.5l5.5 10.5M19.5 2l3.2 10.8"/>',
   tCh:'<path class="fillsel" d="M7.5 3.5h9v6a4.5 4.5 0 0 1-9 0z"/><path d="M7.5 3.5h9v6a4.5 4.5 0 0 1-9 0z"/><path d="M7.5 5.5H4.5a3 3 0 0 0 3.3 4.4M16.5 5.5h3a3 3 0 0 1-3.3 4.4M12 14v3.5M8 20.5h8M9.5 17.5h5"/>',
   tHist:'<circle class="fillsel" cx="12" cy="12" r="8.5"/><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3 3.8V8h4.2"/><path d="M12 7.5V12l3.2 2"/>',
@@ -817,7 +819,7 @@ function examples() {
 function fresh() {
   return {
     v:2,
-    settings:{buffet:'Buffet libre', price:18.9, cur:'EUR', goal:40, theme:'system', accent:'sake', layout:'compact', sound:true, haptics:true},
+    settings:{buffet:'Buffet libre', price:18.9, cur:'EUR', goal:40, theme:'system', accent:'sake', layout:'compact', sound:true, haptics:true, awake:true},
     types: DEFAULT_TYPES.map(t => ({...t})),
     diners:[{id:'d1', name:'Tú', color:DINER_COLORS[0]}],
     active:'d1',
@@ -1223,6 +1225,7 @@ function addN(k, n = 1, ev) {
   const now = Date.now();
   streakN = now - lastAdd < 4000 ? streakN + 1 : 0; lastAdd = now;
   if (!S.session.start) S.session.start = now;
+  keepAwake();
   const entries = [];
   for (let i = 0; i < n; i++) { const e = {t:now + i, d:S.active, k}; S.session.log.push(e); entries.push(e); }
   pushAction({kind:'add', entries});
@@ -1620,8 +1623,9 @@ function histSheet(hid) {
     ${s.diners.map(d => `<div class="gsec"><div class="glabel" style="display:flex;gap:8px;align-items:center"><span class="av sm" style="--c:${d.color}">${esc(initial(d.name))}</span>${esc(d.name)} · ${sum(d.counts)} piezas · ${nf0(kcalOf(d.counts))} kcal</div>
       <div class="group pad"><div class="mini-grid">${Object.entries(d.counts).filter(([, v]) => v).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<div class="mini">${icon(k)}<b>${v}</b>${esc(tname(k))}</div>`).join('')}</div>
       ${(d.medals || []).length ? `<div class="sum-medals" style="margin-top:12px">${d.medals.map(m => chById(m)).filter(Boolean).map(m => medal(m, false)).join('')}</div>` : ''}</div></div>`).join('')}
+    <button class="btn plain" id="shH">${ui('share')}Compartir imagen</button>
     <button class="btn ghost" id="delH">Eliminar sesión</button>`,
-    mount(el) { twoStep($('#delH', el), 'Toca otra vez para eliminar', () => { S.history = S.history.filter(x => x.id !== hid); save(); closeSheet(); renderHistory(); hud('Sesión eliminada'); }); }});
+    mount(el) { $('#shH', el).onclick = () => shareCard(s); twoStep($('#delH', el), 'Toca otra vez para eliminar', () => { S.history = S.history.filter(x => x.id !== hid); save(); closeSheet(); renderHistory(); hud('Sesión eliminada'); }); }});
 }
 
 /* =========================================================
@@ -1641,12 +1645,15 @@ function finishSheet() {
       <span class="av md" style="--c:${x.d.color}">${esc(initial(x.d.name))}</span><span class="row-main"><span class="row-t">${esc(x.d.name)}${i === 0 && people.length > 1 ? '<em class="tag">Gana</em>' : ''}</span>
       <span class="row-d">${x.m.length} ${x.m.length === 1 ? 'medalla' : 'medallas'} · ${money(costOf(counts(x.d.id)))} de coste · ${nf0(kcalOf(counts(x.d.id)))} kcal</span></span><span class="h-tot">${x.n}</span></div>`).join('')}</div></div>
     <button class="btn" id="finSave">Guardar en el historial</button>
+    <button class="btn plain" id="finShare">${ui('share')}Compartir imagen</button>
     <button class="btn ghost" id="finDrop">Descartar sesión</button>`,
     mount(el) {
       const o = new Odo($('#finBig', el)); o.set(0); setTimeout(() => o.set(tot), 140);
+      const mkRec = () => ({id:'s' + Date.now().toString(36), date:S.session.start, buffet:S.settings.buffet, price:S.settings.price, dur:ms,
+          diners:people.map(x => ({me:x.d.id === me().id, name:x.d.name, color:x.d.color, counts:counts(x.d.id), medals:[...x.m]}))});
+      $('#finShare', el).onclick = () => shareCard(mkRec());
       $('#finSave', el).onclick = () => {
-        const rec = {id:'s' + Date.now().toString(36), date:S.session.start, buffet:S.settings.buffet, price:S.settings.price, dur:ms,
-          diners:people.map(x => ({me:x.d.id === me().id, name:x.d.name, color:x.d.color, counts:counts(x.d.id), medals:[...x.m]}))};
+        const rec = mkRec();
         S.history.push(rec);
         people.forEach(x => x.m.forEach(m => S.trophies[m] = (S.trophies[m] || 0) + 1));
         resetSession(); closeSheet(); hud('Sesión guardada'); confetti(110);
@@ -1654,7 +1661,7 @@ function finishSheet() {
       twoStep($('#finDrop', el), 'Toca otra vez para descartar', () => { resetSession(); closeSheet(); hud('Sesión descartada'); });
     }});
 }
-function resetSession() { S.session = {start:null, log:[], done:{}, missions:{}}; undoStack.length = 0; unseen = 0; updateBadge(); save(); renderChips(); updateCounter(); }
+function resetSession() { releaseAwake(); S.session = {start:null, log:[], done:{}, missions:{}}; undoStack.length = 0; unseen = 0; updateBadge(); save(); renderChips(); updateCounter(); }
 
 /* =========================================================
    HOJAS DE EDICIÓN
@@ -1764,12 +1771,15 @@ function renderSettings() {
     <div class="gsec"><div class="glabel">Respuesta</div><div class="group">
       <div class="row"><span class="row-l">Sonidos</span><label class="sw"><input type="checkbox" id="inSound" ${st.sound ? 'checked' : ''}><span></span></label></div>
       <div class="row"><span class="row-l">Vibración</span><label class="sw"><input type="checkbox" id="inHap" ${st.haptics ? 'checked' : ''}><span></span></label></div>
-    </div><p class="gfoot">Safari en iPhone no permite que las webs vibren; en Android sí funciona.</p></div>
+      <div class="row"><span class="row-l">Mantener pantalla encendida</span><label class="sw"><input type="checkbox" id="inAwake" ${st.awake ? 'checked' : ''}><span></span></label></div>
+    </div><p class="gfoot">La pantalla no se apaga mientras hay una sesión en marcha. Safari en iPhone no permite que las webs vibren; en Android sí funciona.</p></div>
     <div class="gsec"><div class="glabel">Datos</div><div class="group">
       ${S.history.some(h => h.ex) ? '<button class="row accent" id="delEx" style="justify-content:center">Quitar sesiones de ejemplo</button>' : ''}
+      <button class="row accent" id="expData" style="justify-content:center">Exportar copia de seguridad</button>
+      <label class="row accent tap" style="justify-content:center;cursor:pointer">Importar copia<input type="file" id="impData" accept="application/json,.json" hidden></label>
       <button class="row danger" id="delHist">Borrar historial</button>
       <button class="row danger" id="resetAll">Restablecer todo</button>
-    </div><p class="gfoot">Todo se guarda solo en este dispositivo.</p></div>`;
+    </div><p class="gfoot">Todo se guarda solo en este dispositivo. Exporta una copia para guardarla o pasarla a otro móvil.</p></div>`;
   wireSettings();
 }
 function wireSettings() {
@@ -1800,7 +1810,10 @@ function wireSettings() {
     if (t.dataset.ton) { typeById(t.dataset.ton).on = t.checked; save(); buildGrid(); feedback('tick'); }
     if (t.id === 'inSound') { st.sound = t.checked; save(); feedback('tick'); }
     if (t.id === 'inHap') { st.haptics = t.checked; save(); feedback('tick'); }
+    if (t.id === 'inAwake') { st.awake = t.checked; save(); feedback('tick'); if (st.awake) keepAwake(); else releaseAwake(); }
+    if (t.id === 'impData' && t.files[0]) { importBackup(t.files[0]); t.value = ''; }
   });
+  $('#expData').onclick = exportBackup;
   $('#resetCosts').onclick = () => { S.types.forEach(t => { const d = DEFAULT_TYPES.find(x => x.id === t.id); t.cost = d.cost; t.carta = d.carta; }); save(); buildGrid(); renderSettings(); hud('Costes restaurados'); };
   const ex = $('#delEx'); if (ex) ex.onclick = () => { S.history = S.history.filter(h => !h.ex); save(); renderSettings(); hud('Ejemplos eliminados'); };
   twoStep($('#delHist'), 'Toca otra vez para borrar', () => { S.history = []; S.trophies = {}; save(); renderSettings(); hud('Historial borrado'); });
@@ -1813,6 +1826,81 @@ function twoStep(btn, label, fn) {
     armed = true; btn.textContent = label; btn.classList.add('armed'); feedback('tick');
     t = setTimeout(() => { armed = false; btn.textContent = old; btn.classList.remove('armed'); }, 3000);
   });
+}
+
+/* =========================================================
+   PANTALLA ENCENDIDA, COPIA DE SEGURIDAD E IMAGEN PARA COMPARTIR
+   ========================================================= */
+let wake = null;
+async function keepAwake() {
+  if (!S.settings.awake || !S.session.start || document.hidden || wake || !navigator.wakeLock) return;
+  try { wake = await navigator.wakeLock.request('screen'); wake.addEventListener('release', () => { wake = null; }); } catch (e) {}
+}
+function releaseAwake() { if (wake) { try { wake.release(); } catch (e) {} wake = null; } }
+document.addEventListener('visibilitychange', () => { if (!document.hidden) keepAwake(); });
+const ymd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+function saveFile(blob, name) {
+  try {
+    const f = new File([blob], name, {type:blob.type});
+    if (navigator.canShare && navigator.canShare({files:[f]})) { navigator.share({files:[f], title:name}).catch(() => {}); return; }
+  } catch (e) {}
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+}
+function exportBackup() { saveNow(); saveFile(new Blob([JSON.stringify(S)], {type:'application/json'}), `sushi-copia-${ymd(new Date())}.json`); }
+function importBackup(file) {
+  const r = new FileReader();
+  r.onload = () => {
+    let data;
+    try { data = JSON.parse(r.result); if (!data || !data.settings || !Array.isArray(data.history)) throw 0; }
+    catch (e) { hud('Ese archivo no es una copia válida'); return; }
+    const n = data.history.filter(h => !h.ex).length;
+    openSheet({title:'Importar copia', body:`<div class="sh-hero">${icon('maki').replace('<svg', '<svg style="width:84px;height:84px"')}<h4>¿Reemplazar tus datos?</h4>
+      <p>La copia tiene ${n} ${n === 1 ? 'sesión' : 'sesiones'}, ${Object.keys(data.ach || {}).length} logros y ${data.xp || 0} XP. Lo que hay ahora en este dispositivo se sustituirá.</p></div>
+      <button class="btn" id="impOk">Reemplazar datos</button>`,
+      mount(el) { $('#impOk', el).onclick = () => { S = migrate(data); undoStack.length = 0; applyLook(); saveNow(); closeSheet(); buildGrid(); refreshAll(); hud('Copia importada'); }; }});
+  };
+  r.readAsText(file);
+}
+function darken(hex, t) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim()); if (!m) return hex;
+  const v = parseInt(m[1], 16), f = c => Math.round(c * (1 - t));
+  return `rgb(${f(v >> 16)},${f(v >> 8 & 255)},${f(v & 255)})`;
+}
+const loadImg = src => new Promise(res => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = src; });
+const iconURL = k => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="240" height="240">${(ICON[k] || ICON.maki).replace(/class="shd"/g, 'fill="rgba(30,20,10,.16)"').replace(/class="rim"/g, 'stroke="rgba(0,0,0,.08)" stroke-width="1"')}</svg>`);
+async function shareCard(rec) {
+  hud('Preparando imagen');
+  const W = 1080, H = 1350, c = document.createElement('canvas'); c.width = W; c.height = H;
+  const x = c.getContext('2d'), F = '-apple-system,"SF Pro Display",system-ui,"Segoe UI",Roboto,sans-serif', R = 'ui-rounded,"SF Pro Rounded",Nunito,system-ui,sans-serif';
+  const acc = cssAccent(), all = {};
+  rec.diners.forEach(d => Object.entries(d.counts).forEach(([k, v]) => all[k] = (all[k] || 0) + v));
+  const tot = sum(all), top = Object.entries(all).filter(e => e[1]).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const imgs = await Promise.all(top.map(([k]) => loadImg(iconURL(k))));
+  const g = x.createLinearGradient(0, 0, W * .4, H); g.addColorStop(0, acc); g.addColorStop(1, darken(acc, .45)); x.fillStyle = g; x.fillRect(0, 0, W, H);
+  x.fillStyle = 'rgba(255,255,255,.07)'; x.beginPath(); x.arc(W - 60, 140, 330, 0, 7); x.fill(); x.beginPath(); x.arc(80, H - 120, 240, 0, 7); x.fill();
+  const rr = (X, Y, w, h, r) => { x.beginPath(); if (x.roundRect) x.roundRect(X, Y, w, h, r); else x.rect(X, Y, w, h); };
+  x.fillStyle = 'rgba(255,255,255,.72)'; x.font = `700 34px ${F}`; x.fillText('CONTADOR DE SUSHI', 80, 120);
+  x.fillStyle = '#fff'; x.font = `800 68px ${F}`; x.fillText(rec.buffet.slice(0, 26), 80, 200);
+  x.fillStyle = 'rgba(255,255,255,.8)'; x.font = `500 38px ${F}`;
+  x.fillText(`${new Date(rec.date).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'})} · ${durShort(rec.dur)}`, 80, 258);
+  x.fillStyle = '#fff'; x.font = `900 280px ${R}`; x.fillText(String(tot), 70, 540);
+  const tw = x.measureText(String(tot)).width; x.font = `800 56px ${F}`; x.fillText('piezas', 100 + tw, 540);
+  if (rec.diners.length > 1) { x.font = `600 36px ${F}`; x.fillStyle = 'rgba(255,255,255,.88)'; x.fillText(rec.diners.map(d => `${d.name} ${sum(d.counts)}`).join('  ·  ').slice(0, 52), 80, 610); }
+  const cw = 212, ch = 222, gap = 18, x0 = 80, y0 = 650;
+  top.forEach(([k, v], i) => {
+    const X = x0 + (i % 4) * (cw + gap), Y = y0 + Math.floor(i / 4) * (ch + gap);
+    x.fillStyle = 'rgba(255,255,255,.95)'; rr(X, Y, cw, ch, 44); x.fill();
+    if (imgs[i]) x.drawImage(imgs[i], X + 38, Y + 10, 136, 136);
+    x.fillStyle = '#1c1c1e'; x.font = `900 50px ${R}`; x.textAlign = 'center'; x.fillText('×' + v, X + cw / 2, Y + 196); x.textAlign = 'left';
+  });
+  const cost = costOf(all), paid = rec.price * rec.diners.length, medals = rec.diners.reduce((a, d) => a + (d.medals || []).length, 0);
+  const by = 1210; x.fillStyle = 'rgba(0,0,0,.18)'; rr(80, by - 70, W - 160, 130, 40); x.fill();
+  [['Pagado', money(paid)], ['Coste real', money(cost)], ['Medallas', String(medals)]].forEach(([l, v], i) => {
+    const X = 120 + i * 300; x.fillStyle = 'rgba(255,255,255,.7)'; x.font = `600 28px ${F}`; x.fillText(l, X, by - 22);
+    x.fillStyle = '#fff'; x.font = `900 44px ${R}`; x.fillText(v, X, by + 30);
+  });
+  c.toBlob(b => { if (b) saveFile(b, `sushi-${ymd(new Date(rec.date))}.png`); else hud('No se pudo crear la imagen'); }, 'image/png');
 }
 
 /* =========================================================
@@ -1967,6 +2055,8 @@ setInterval(() => {
   updateTime();
   if (++tickN % 15 === 0) { S.diners.forEach(d => checkAll(d.id)); updateCounter(); }
 }, 1000);
+keepAwake();
+if ('serviceWorker' in navigator && location.protocol === 'https:' && document.querySelector('link[rel="manifest"]')) navigator.serviceWorker.register('sw.js').catch(() => {});
 })();
 </script>
 <!--ARTIFACT-BODY-END-->
