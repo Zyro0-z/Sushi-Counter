@@ -1,7 +1,7 @@
 {
   "name": "Contador de Sushi",
   "short_name": "Sushi",
-  "description": "Cuenta lo que comes en el buffet: coste real, misiones, desafíos y logros.",
+  "description": "Cuenta lo que comes en el buffet: coste real, misiones, desafíos, logros, duelos y ruleta.",
   "lang": "es",
   "start_url": "./",
   "scope": "./",
@@ -12,5 +12,11 @@
   "icons": [
     {"src": "apple-touch-icon.png", "sizes": "180x180", "type": "image/png"},
     {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+  ],
+  "shortcuts": [
+    {"name": "Empezar sesión", "short_name": "Empezar", "url": "./?a=empezar", "icons": [{"src": "apple-touch-icon.png", "sizes": "180x180"}]},
+    {"name": "Retos", "url": "./?a=retos", "icons": [{"src": "apple-touch-icon.png", "sizes": "180x180"}]},
+    {"name": "Ruleta de sushi", "short_name": "Ruleta", "url": "./?a=ruleta", "icons": [{"src": "apple-touch-icon.png", "sizes": "180x180"}]},
+    {"name": "Historial", "url": "./?a=historial", "icons": [{"src": "apple-touch-icon.png", "sizes": "180x180"}]}
   ]
 }

@@ -1,0 +1,10 @@
+{
+  "name": "contador-sushi",
+  "private": true,
+  "type": "module",
+  "description": "Contador de sushi para buffets con aspecto de iOS. Sin dependencias ni compilación.",
+  "scripts": {
+    "test": "node --test",
+    "start": "python3 -m http.server 8080"
+  }
+}

@@ -1,42 +1,77 @@
 # Contador de Sushi
 
-Web app con aspecto de iOS para llevar la cuenta de lo que comes en un buffet de sushi. Funciona sin conexión y se instala en el iPhone como una app más.
+Web app con aspecto de iOS para llevar la cuenta de lo que comes en un buffet de sushi. Se instala en el iPhone como una app más, funciona sin conexión y no necesita cuenta.
 
 <p align="center">
-  <img src="docs/contador-light.png" width="250" alt="Pantalla del contador">
-  <img src="docs/retos.png" width="250" alt="Pantalla de retos">
-  <img src="docs/contador-dark.png" width="250" alt="Contador en modo oscuro">
+  <img src="docs/contador.png" width="210" alt="Contador con la cinta kaiten y la mascota">
+  <img src="docs/torre.png" width="210" alt="Torre de platos">
+  <img src="docs/retos.png" width="210" alt="Retos con nivel y misiones">
+  <img src="docs/tokio.png" width="210" alt="Tema Tokio de noche">
 </p>
-
-## Qué hace
-
-- **30 tipos de pieza** con iconos propios: nigiris, sashimi, rolls, gyoza, pollo teriyaki, pato pekín, bao, postres y más.
-- **La cuenta real**: lo que pagas, lo que le cuesta al restaurante en ingredientes y lo que valdría en carta.
-- **Retos**: 3 misiones aleatorias por sesión, 37 desafíos, 27 logros y niveles con XP.
-- **Varios comensales** con su propio color, duelo de la mesa y misiones para cada uno.
-- **Deshacer fácil**: botón −, aviso con «Deshacer», menú al mantener pulsado y registro con deslizar para borrar.
-- **Historial** con gráfica, balance acumulado e imagen para compartir cada sesión.
-- **Copia de seguridad** para pasar tus datos a otro móvil.
-- Mantiene la pantalla encendida durante la comida y funciona sin conexión.
 
 ## Instalar en el iPhone
 
 1. Abre **https://zyro0-z.github.io/Sushi-Counter/** en Safari.
 2. Pulsa **Compartir › Añadir a pantalla de inicio**.
 
-Los datos se guardan solo en tu dispositivo.
+## Qué hace
+
+**Contar**
+- 30 piezas con iconos propios en 5 categorías, y piezas personalizadas con plantilla y color.
+- Toca para sumar, desliza a la derecha para sumar varias, a la izquierda para quitar y mantén pulsado para el menú.
+- Deshacer en un toque y registro con hora, en el que deslizas para borrar.
+- Cinta kaiten animada, torre de platos con los colores de cada categoría y gráfica de ritmo.
+- Shari, la mascota: reacciona a tu ritmo, se duerme si paras y te da ideas.
+
+**El dinero**
+- La cuenta real: lo que pagas, lo que cuestas en ingredientes y lo que valdría en carta.
+- Varios buffets con precio de mediodía, noche y fin de semana, elegido solo según la hora.
+- Escaneo de tickets: lee el total y el nombre del restaurante con una foto.
+
+**Jugar**
+- 3 misiones aleatorias por sesión, 37 desafíos, 35 logros, 15 títulos y niveles con XP.
+- Duelo en directo a pantalla partida, ruleta de sushi y contrarreloj.
+- Mesa compartida: cada uno cuenta en su móvil y el marcador se junta en directo.
+- Rachas semanales, calendario, ranking histórico de la mesa y celebraciones distintas según el logro.
+
+**Datos y ajustes**
+- Estadísticas: comparación con tu media, favoritas, mapa de calor por día y hora y nutrición.
+- Alérgenos (marcar u ocultar piezas), proteínas, hidratos y grasas, y aviso de calorías.
+- Temas: iOS, Tokio de noche, Madera y papel y Minimal. Ocho colores de acento.
+- Accesibilidad: texto según el iPhone, contraste alto, menos animaciones, VoiceOver y teclado.
+- Copia de seguridad en iCloud Drive (a través de Compartir) y exportación a Excel en CSV.
 
 ## Costes
 
-El coste de cada pieza es una estimación de ingredientes con precios de mayorista de 2026 (salmón en filete ~15 €/kg, atún ~22 €/kg, arroz ~2 €/kg). No incluye sueldos, local ni luz. Se puede ajustar pieza a pieza desde la app.
+El coste de cada pieza es una estimación de ingredientes con precios de mayorista de 2026 (salmón en filete ~15 €/kg, atún ~22 €/kg, arroz ~2 €/kg, pollo ~6 €/kg). No incluye sueldos, local ni luz. Se puede ajustar pieza a pieza.
 
-## Archivos
+## Limitaciones
 
-| Archivo | Para qué sirve |
+- La mesa compartida usa el servicio público [ntfy.sh](https://ntfy.sh): solo envía nombres, colores y recuentos, y necesita internet.
+- El escáner de tickets descarga [Tesseract.js](https://tesseract.projectnaptha.com/) (unos 5 MB) la primera vez.
+- Safari en iPhone no permite que las webs vibren ni muestra los accesos rápidos del icono; en Android sí funcionan.
+- Los datos viven en el dispositivo. Usa la copia de seguridad para no perderlos.
+
+## Desarrollo
+
+Sin dependencias ni compilación: HTML, CSS y módulos de JavaScript.
+
+```
+npm start      # servidor local en http://localhost:8080
+npm test       # pruebas de la lógica con node --test
+```
+
+| Ruta | Contenido |
 | --- | --- |
-| `index.html` | Toda la app: estilos, iconos y lógica |
-| `sw.js` | Guarda la app para usarla sin conexión |
-| `manifest.webmanifest` | Nombre, colores e icono al instalarla |
-| `docs/` | Capturas del README |
+| `index.html` | Estructura de la página |
+| `css/app.css` | Estilos y temas |
+| `js/catalog.js` | Piezas, costes, alérgenos, nutrición y temas |
+| `js/store.js` | Estado guardado y migraciones |
+| `js/logic.js` | Cálculos, retos, logros, misiones y estadísticas |
+| `js/icons.js` | Iconos, medallas y mascota |
+| `js/fx.js` | Sonidos, vibración y partículas |
+| `js/ui/*.js` | Pantallas y hojas |
+| `sw.js` | Modo sin conexión |
+| `tests/` | Pruebas |
 
 Al publicar cambios, sube la versión de `CACHE` en `sw.js` para que los móviles descarguen la nueva.
