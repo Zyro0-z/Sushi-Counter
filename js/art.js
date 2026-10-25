@@ -229,10 +229,55 @@ export const TPL = {
   roll: c => SH(24, 42, 20, 3) + L('rect x="4.5" y="22" width="39" height="16.4" rx="8.2"', RICE, 'V') + grainsRect(7, 26, 34, 10, 16, 9)
     + [7.5, 14, 20.5, 27, 33.5].map((x, i) => L(`ellipse cx="${x + 3.2}" cy="21.4" rx="6.8" ry="5.2"`, i % 2 ? darken(c, .08) : c, 'DL')).join(''),
 };
+// Platos de la carta sin pieza de serie: dibujos genéricos con la misma luz
+const plateDish = (top) => SH(24, 42, 20, 3) + L('ellipse cx="24" cy="33" rx="20" ry="8"', '#F4F1EC', 'D') + `<ellipse cx="24" cy="33" rx="20" ry="8" fill="none" class="rim"/>`
+  + `<ellipse cx="24" cy="33" rx="15" ry="5.4" fill="none" stroke="#3E6FB0" stroke-width=".9" opacity=".55"/>` + top;
+Object.assign(ICON, {
+  tarta: SH(24, 42, 18, 3) + L('ellipse cx="24" cy="37" rx="19" ry="5"', '#F5F2EC', 'D') + `<ellipse cx="24" cy="37" rx="19" ry="5" fill="none" class="rim"/>`
+    + L('path d="M8 23.5L36 14.5l6 4.2V31L14 38.8 8 35.6Z"', '#F2D9A2', 'D') + L('path d="M8 23.5l6 3.2v12.1l-6-3.2Z"', '#E6C27F', 'D')
+    + `<path d="M14 30.4L42 22.8M14 34L42 26.6" stroke="#FFF8EC" stroke-width="1.6"/><path d="M14 30.4l-6-3.1M14 34l-6-3.1" stroke="#FFF8EC" stroke-width="1.4"/>`
+    + L('path d="M8 23.5L36 14.5l6 4.2L14 26.7Z"', '#FFF6E6', 'L') + `<path d="M8 23.5L36 14.5l6 4.2L14 26.7Z" fill="none" stroke="#E8D3AC" stroke-width=".6"/>`
+    + L('path d="M10 23.6c2.4 1.8 5 2.6 6.8 2.4l-2.8.7-6-3.1Z"', '#C9483C', 'L')
+    + `<path d="M8.6 24.8c1.2 3 2.8 4.4 3.6 7.4M12.6 26.6c.6 2.6-.4 4.8.4 6.6" stroke="#C9483C" stroke-width="1.4" fill="none" stroke-linecap="round" opacity=".85"/>`
+    + sphere(30, 14.6, 3.4, '#E5333F', .8) + `<path d="M29 11.6l1.2-2 1.4 1.8" stroke="#3E8E2F" stroke-width="1.2" fill="none" stroke-linecap="round"/>` + flecks(30, 14.6, 2.4, 2.4, 6, 211, '#FFE08A', .9),
+  plato: SH() + bowlOf('#EFEAE0', '#B57A3C', '#3E6FB0') + L('path d="M8.5 22c2-6 8.6-9.6 15.5-9.6S37.5 16 39.5 22c-4.6 1.6-9.6 2.4-15.5 2.4S13.1 23.6 8.5 22Z"', '#C98A4B', 'DL')
+    + [[14, 18, '#7CC04B'], [20, 15.6, '#F07B2C'], [27, 16.4, '#E8445A'], [33, 19, '#7CC04B'], [23.6, 20.6, '#FFD84A'], [17.6, 21, '#F07B2C'], [30, 21.6, '#8B5A2B']].map(([x, y, c], i) => L(`rect x="${x - 2}" y="${y - 1.4}" width="4" height="2.8" rx="1" transform="rotate(${i * 37 % 90 - 30} ${x} ${y})"`, c, 'L')).join('')
+    + L('path d="M16.4 17.4L42.6 4.4l.8 1.4L17.2 18.8z"', '#A5713E', 'L') + L('path d="M20 18.6L44.6 8l.6 1.4L20.6 20z"', '#9A6634', 'L') + steam([12, 17], 15),
+  carne: plateDish([[10, 27], [18, 25.5], [26, 25.4], [33, 27]].map(([x, y], i) => `<g transform="rotate(${-8 + i * 5} ${x + 3} ${y + 3})">${L(`rect x="${x}" y="${y - 2}" width="7.6" height="9" rx="2.4"`, '#8E3B2A', 'DL')}<path d="M${x + 1.4} ${y + 1}h4.8M${x + 1.4} ${y + 4}h4.8" stroke="#5A2216" stroke-width=".9" opacity=".7"/></g>`).join('')
+    + `<path d="M12 33.6c3-1.6 6-1.6 9 0M24 34c3-1.4 6-1.4 9 0M17 35.6c2.6-1 5-1 7.6 0" stroke="#F2E6C8" stroke-width="1.6" fill="none" stroke-linecap="round"/>` + seeds([[15, 26.6, 20], [22, 25.8, -30], [29, 26, 10], [35, 28, -20]]) + sizzle([[8, 22], [40, 22], [24, 19]])),
+  marisco: plateDish(`<path d="M10 31c-1-6 3-10 8-10.6 4-.4 7 1.6 8 4.8-3.6-.8-6.6.2-8.6 2.4-1.4 1.6-2 3.2-2 4.6-2.6.6-4.6.2-5.4-1.2z" fill="#FF8A5C"/><path d="M10 31c-1-6 3-10 8-10.6 4-.4 7 1.6 8 4.8-3.6-.8-6.6.2-8.6 2.4-1.4 1.6-2 3.2-2 4.6-2.6.6-4.6.2-5.4-1.2z" fill="url(#ovL)"/>`
+    + `<path d="M12.6 25.6l3 2M15.4 22.8l2.4 2.8M19 21.4l1.4 3.2" stroke="#E2521F" stroke-width="1.6" stroke-linecap="round"/>`
+    + `<g transform="rotate(-18 31 28)">${L('ellipse cx="31" cy="28" rx="8" ry="4.6"', '#2B2D42', 'L')}${L('ellipse cx="31" cy="28.6" rx="6.2" ry="3.2"', '#F2B45A', 'DL')}</g>`
+    + L('circle cx="20" cy="32.6" r="3"', '#F3E2C6', 'DL') + `<path d="M36 33.6l3-1.6" stroke="#FFD84A" stroke-width="2.6" stroke-linecap="round"/>` + flecks(24, 31, 12, 3, 10, 221, '#3F8A30', .9)),
+});
+Object.assign(TPL, {
+  uramaki: c => cylinder({outer:RICE, side:'#E4D7BD', rice:null, s:15, sesame:true}) + grainsRing(24, 22, 16, 12.8, 9.6, 7.6, 22, 16)
+    + L('ellipse cx="24" cy="22" rx="9.4" ry="7.6"', NORI, 'L') + L('ellipse cx="24" cy="22" rx="7.6" ry="6"', '#FFF8F0', 'D')
+    + L('path d="M24 16a7.6 6 0 0 0 0 12z"', c, 'DL') + L('path d="M24 16a7.6 6 0 0 1 7.6 6H24z"', AVO, 'DL') + `<path d="M21 19.4c1.3.5 2.3.5 3 .2M21 22.8c1.3.5 2.3.5 3 .2" stroke="${lighten(c, .5)}" stroke-width=".8" fill="none"/>`,
+  temaki: c => SH(25, 42.4, 13, 2.8) + L('path d="M11.5 17.5L29.5 41.5c1 1.4 3 1.1 3.4-.6L39.5 15Z"', NORI, 'DL')
+    + L('ellipse cx="25.5" cy="16.2" rx="14.2" ry="5.4" transform="rotate(-5 25.5 16.2)"', RICE, 'D') + grainsRing(25.5, 16.2, 13.4, 4.8, 3, 1, 12, 61)
+    + L('path d="M15.2 15.2c1.4-6.6 8.6-9.8 13.2-6.6-1 4.6-7 7.8-13.2 6.6Z"', c, 'DL') + `<path d="M18.6 11.6c2.3-1.6 5-2.1 7.2-1.3" stroke="${lighten(c, .5)}" stroke-width="1.1" fill="none" stroke-linecap="round"/>`
+    + L('path d="M29.5 17.2c2-3.2 6.2-4.2 8.8-2.6-1.5 2.8-5.2 3.8-8.8 2.6Z"', AVO, 'L'),
+});
+/* Insignias de detalle (flambeado, crujiente…) en la esquina del dibujo */
+const BADGE = {
+  flame:['#FF6A1A', '<g class="bflame"><path d="M0 4.4c-2.3 0-3.7-1.5-3.7-3.4 0-2 1.4-2.9 2-4.6.9.9 1.2 1.7 1.2 2.6.7-.6 1.5-1.9 1.3-3.6 1.9 1.2 2.9 3.3 2.9 5.5 0 2-1.5 3.5-3.7 3.5z" fill="#FFD66B"/><path d="M0 4.4c-1.1 0-1.8-.8-1.8-1.7 0-1 .8-1.5 1.1-2.4.6.6.9 1.2.9 1.8.4-.3.7-.8.7-1.5.8.6 1.1 1.4 1.1 2.1 0 1-.9 1.7-2 1.7z" fill="#FFF4C8"/></g>'],
+  crispy:['#D99A35', '<circle cx="-2" cy="-1.6" r="1.6" fill="#FFE2A0"/><circle cx="1.8" cy="-2" r="1.3" fill="#FFF0C8"/><circle cx="2" cy="1.8" r="1.6" fill="#FFE2A0"/><circle cx="-1.8" cy="2.2" r="1.1" fill="#FFF0C8"/><circle cx="0" cy="0" r=".9" fill="#FFF8E0"/>'],
+  spicy:['#E5333F', '<path d="M-3.4 3.6c3.6-.4 6-3 6.2-6.4l-1.6-.4c-.4 2.6-2.2 4.6-5 5z" fill="#FFF"/><path d="M2.4-3.2c.2-1 1-1.6 1.8-1.6" stroke="#9BE07A" stroke-width="1.3" fill="none" stroke-linecap="round"/>'],
+  cheese:['#F5B70A', '<path d="M-4 2.8L3.8-1v4.2H-4z" fill="#FFE680"/><path d="M-4 2.8L3.8-1 1.6-3.4z" fill="#FFF3B8"/><circle cx="-.6" cy="1.8" r=".7" fill="#E9B800"/><circle cx="2" cy="2.2" r=".5" fill="#E9B800"/>'],
+  sauce:['#8E4B22', '<path d="M0-4.2c1.8 2.4 3 4 3 5.4a3 3 0 0 1-6 0c0-1.4 1.2-3 3-5.4z" fill="#F2C08A"/><ellipse cx="-1" cy=".8" rx=".7" ry="1.1" fill="#FFF0DA"/>'],
+  truffle:['#3A2A22', '<circle r="3.4" fill="#6B5446"/><circle cx="-1.2" cy="-1" r=".6" fill="#A08A78"/><circle cx="1.2" cy=".4" r=".5" fill="#A08A78"/><circle cx="-.2" cy="1.6" r=".5" fill="#A08A78"/>'],
+  fruit:['#3FAE5A', '<path d="M-3 2.6c0-3.4 2.4-5.6 6-5.8-.2 3.6-2.4 6-6 5.8z" fill="#D8F5B8"/><path d="M-2.6 2.4L2 -1.8" stroke="#3FAE5A" stroke-width=".8"/>'],
+  foie:['#B07A55', '<ellipse rx="3.6" ry="2.6" fill="#F3D2B0"/><ellipse cx="-1" cy="-.8" rx="1.4" ry=".7" fill="#FFF0E0"/>'],
+};
+export function badges(mods = []) {
+  return mods.filter(m => BADGE[m]).slice(0, 2).map((m, i) => `<g class="mbadge" transform="translate(40.5 ${8 + i * 14.5})"><circle r="7.4" fill="#fff"/><circle r="6.2" fill="${BADGE[m][0]}"/><circle r="6.2" fill="url(#ovB)"/>${BADGE[m][1]}</g>`).join('');
+}
 export function iconInner(k, t) {
   if (ICON[k]) return ICON[k];
-  if (t && t.tpl && TPL[t.tpl]) return TPL[t.tpl](t.color || SAL);
-  return ICON.maki;
+  if (!t) return ICON.maki;
+  const art = t.tpl && TPL[t.tpl] ? TPL[t.tpl](t.color || SAL) : ICON[t.like] || ICON[t.base] || ICON.maki;
+  return art + badges(t.mods);
 }
 
 /* ---------- Ilustraciones de los juegos y herramientas (64×64) ---------- */
@@ -262,6 +307,14 @@ export const ILLU = {
     + L('rect x="27" y="40" width="10" height="12" rx="1"', '#7A4E28', 'L') + `<rect x="14" y="40" width="9" height="7" rx="1" fill="#BFE3FF"/><rect x="41" y="40" width="9" height="7" rx="1" fill="#BFE3FF"/>`
     + L('ellipse cx="51" cy="10" rx="2.6" ry="3.6"', '#E5484D', 'DL') + `<path d="M51 13.6v2" stroke="#2B2B33" stroke-width="1"/>`,
 };
+// Carta del restaurante: librito abierto con platos dibujados
+ILLU.carta = IS(32, 57, 25, 3.4) + L('path d="M5 14c8-3 17-3 27 1v40c-10-4-19-4-27-1z"', '#FFFDF7', 'D') + L('path d="M59 14c-8-3-17-3-27 1v40c10-4 19-4 27-1z"', '#FFFFFF', 'D')
+  + `<path d="M5 14c8-3 17-3 27 1M59 14c-8-3-17-3-27 1" stroke="#C8954E" stroke-width="2" fill="none"/><path d="M32 15v40" stroke="#E2D6C2" stroke-width="1.2"/>`
+  + `<path d="M3.6 16v39.6c9-3.2 18.4-3 28.4 1 10-4 19.4-4.2 28.4-1V16" stroke="#B9873F" stroke-width="2.4" fill="none" stroke-linejoin="round"/>`
+  + `<g transform="translate(7 18) scale(.42)">${ICON.nigiri}</g><g transform="translate(7 33) scale(.42)">${ICON.maki}</g>`
+  + `<path d="M28 23.4h-.1M28 38.4h-.1" stroke="#FA5D3C" stroke-width="2.6" stroke-linecap="round"/><path d="M27.4 29h-.1M27.4 44h-.1" stroke="#C7C7CC" stroke-width="1.6" stroke-linecap="round"/>`
+  + `<path d="M36 22h17M36 26.6h12M36 33h17M36 37.6h10M36 44h17M36 48.6h13" stroke="#C7C7CC" stroke-width="1.8" stroke-linecap="round"/><path d="M36 22h9M36 33h7M36 44h8" stroke="#1C1C1E" stroke-width="1.8" stroke-linecap="round"/>`
+  + `<path d="M49 12v12l2.6-2.2 2.6 2.2V12z" fill="#E5484D"/><path d="M49 12v12l2.6-2.2 2.6 2.2V12z" fill="url(#ovL)"/>`;
 ILLU.ayuda = IS() + L('path d="M10 14c0-4.4 3.6-8 8-8h28c4.4 0 8 3.6 8 8v18c0 4.4-3.6 8-8 8H30l-10 9v-9h-2c-4.4 0-8-3.6-8-8z"', '#0A84FF', 'DL')
   + `<text x="32" y="32" text-anchor="middle" font-family="ui-rounded,Nunito,system-ui" font-weight="900" font-size="22" fill="#fff">?</text>`;
 export const illu = (k, cls = '') => `<svg viewBox="0 0 64 64" class="illu ${cls}" aria-hidden="true">${ILLU[k] || ''}</svg>`;

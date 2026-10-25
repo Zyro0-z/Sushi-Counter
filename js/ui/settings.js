@@ -1,7 +1,8 @@
 // Ajustes con subpantallas al estilo iOS, y hojas para editar buffets, piezas y comensales.
 import {S, save, saveNow, fresh, setState} from '../store.js';
 import {CATS, ALLERGENS, DEFAULT_TYPES, DINER_COLORS, ACCENTS, SKINS, CURRENCIES, PRICE_SLOTS, TEMPLATES, FOOD_COLORS} from '../catalog.js';
-import {ui, alg, TPL, medal} from '../icons.js';
+import {ui, alg, TPL, medal, illu} from '../icons.js';
+import {openFinder, menuSheet, menuCount} from './carta.js';
 import {me, initial, money, fmtDec, parseNum, nf0, typeById, sortTypes, macroOf, level, activeTitle, slotFor, currentBuffet, sessionSlot, priceNow} from '../logic.js';
 import {$, $$, esc, app, icon, openSheet, closeSheet, twoStep, stepper, bindStepper, seg, bindSeg, sw, applyLook} from './common.js';
 import {feedback, hud, sound} from '../fx.js';
@@ -14,6 +15,26 @@ const actRow = (id, ic, label, color = 'var(--accent)', cls = '') => `<button cl
 export function settingsGo(page) { stack.push(page); renderSettings('push'); }
 export function settingsBack() { if (stack.length > 1) { stack.pop(); renderSettings('pop'); } }
 export function settingsRoot() { stack.length = 1; }
+// Volver atrás deslizando desde el borde izquierdo, como en iOS
+export function initSwipeBack() {
+  const v = $('#v-set'), body = $('#setBody');
+  let on = false, id = null, x0 = 0, y0 = 0, dx = 0, t0 = 0;
+  v.addEventListener('pointerdown', e => { if (stack.length < 2 || e.clientX - v.getBoundingClientRect().left > 30) return; on = true; id = e.pointerId; x0 = e.clientX; y0 = e.clientY; dx = 0; t0 = Date.now(); });
+  v.addEventListener('pointermove', e => {
+    if (!on || e.pointerId !== id) return;
+    dx = Math.max(0, e.clientX - x0);
+    if (dx < 12 && Math.abs(e.clientY - y0) > 14) { on = false; return; }
+    body.style.transition = 'none'; body.style.transform = `translateX(${dx}px)`; body.style.opacity = String(1 - Math.min(.4, dx / 900));
+  });
+  const end = e => {
+    if (!on || e.pointerId !== id) return; on = false;
+    const fast = dx / Math.max(1, Date.now() - t0) > .45;
+    body.style.transition = 'transform .35s var(--spring),opacity .3s'; body.style.transform = ''; body.style.opacity = '';
+    if (dx > 90 || (fast && dx > 30)) { feedback('tick'); settingsBack(); }
+    setTimeout(() => { body.style.transition = ''; }, 380);
+  };
+  v.addEventListener('pointerup', end); v.addEventListener('pointercancel', end);
+}
 
 export function renderSettings(dir) {
   const page = stack[stack.length - 1], st = S.settings;
@@ -23,7 +44,7 @@ export function renderSettings(dir) {
   let h = `<div><h1 class="lt">${TITLES[page]}</h1></div>`;
   if (page === 'root') {
     const lv = level(), m = me();
-    const vis = S.types.filter(t => t.on && !t.deleted).length, all = S.types.filter(t => !t.deleted).length;
+    const vis = S.types.filter(t => t.on && !t.deleted && !t.menu).length, all = S.types.filter(t => !t.deleted && !t.menu).length;
     h += `<button class="card prof-row" id="profRow"><span class="av xl sm2" style="--c:${m.color}">${esc(initial(m.name))}</span><span class="row-main"><span class="row-t" style="font-size:20px">${esc(m.name)}</span><span class="row-d">${esc(activeTitle().t)} · nivel ${lv.l}</span></span>${ui('chev', 'chev')}</button>
     <div class="gsec"><div class="glabel">Comida</div><div class="group">
       ${navRow('buffets', 'pin', 'Buffets y precios', esc(currentBuffet().name), '#FF9500')}
@@ -52,8 +73,9 @@ export function renderSettings(dir) {
   if (page === 'buffets') {
     const slot = slotFor(new Date());
     h += `<div class="gsec"><div class="glabel">Tus buffets</div><div class="group" id="bufList">
-      ${S.buffets.map(b => `<div class="row tap" data-buf="${b.id}" style="--ins:16px;cursor:pointer" role="button" tabindex="0"><span class="row-main"><span class="row-t">${esc(b.name)}${b.id === S.buffetId ? '<em class="tag">Habitual</em>' : ''}</span>
+      ${S.buffets.map(b => `<div class="row tap" data-buf="${b.id}" style="--ins:16px;cursor:pointer" role="button" tabindex="0"><span class="row-main"><span class="row-t">${esc(b.name)}${b.id === S.buffetId ? '<em class="tag">Habitual</em>' : ''}${menuCount(b.id) ? `<em class="tag carta">Carta · ${menuCount(b.id)}</em>` : ''}</span>
         <span class="row-d">${PRICE_SLOTS.map(s => `${s.name} ${money(b.prices[s.id])}`).join(' · ')}</span></span>${ui('chev', 'chev')}</div>`).join('')}
+      <button class="row accent" id="findRow">${ui('search', '', 'width:22px;height:22px')}<span class="row-l">Buscar restaurante y su carta</span></button>
       <button class="row accent" id="addBuf">${ui('plus', '', 'width:22px;height:22px')}<span class="row-l">Añadir buffet</span></button>
       <button class="row accent" id="scanRow">${ui('camera', '', 'width:22px;height:22px')}<span class="row-l">Escanear un ticket</span></button>
     </div><p class="gfoot">El precio se elige solo según el momento: mediodía (lunes a viernes antes de las 17:00), noche o fin de semana. Ahora toca «${PRICE_SLOTS.find(s => s.id === slot).name.toLowerCase()}».</p></div>
@@ -61,7 +83,7 @@ export function renderSettings(dir) {
   }
   if (page === 'types') {
     h += CATS.map(c => `<div class="gsec"><div class="glabel">${c.name}</div><div class="group">
-      ${sortTypes(S.types.filter(t => t.cat === c.id && !t.deleted)).map(t => `<div class="row tap" style="--ins:64px;cursor:pointer" data-type="${t.id}" tabindex="0" role="button"><span class="ricon">${icon(t.id)}</span><span class="row-l">${esc(t.name)}${t.tpl ? '<em class="tag">Tuya</em>' : ''}<span class="sub">${money(t.cost)} coste · ${money(t.carta)} carta · ${t.kcal} kcal</span></span>
+      ${sortTypes(S.types.filter(t => t.cat === c.id && !t.deleted && !t.menu)).map(t => `<div class="row tap" style="--ins:64px;cursor:pointer" data-type="${t.id}" tabindex="0" role="button"><span class="ricon">${icon(t.id)}</span><span class="row-l">${esc(t.name)}${t.tpl ? '<em class="tag">Tuya</em>' : ''}<span class="sub">${money(t.cost)} coste · ${money(t.carta)} carta · ${t.kcal} kcal</span></span>
         <label class="sw" aria-label="Mostrar ${esc(t.name)}"><input type="checkbox" data-ton="${t.id}" ${t.on ? 'checked' : ''}><span></span></label></div>`).join('')}
     </div></div>`).join('') + `<div class="gsec"><div class="group">
       <button class="row accent" id="newType">${ui('sparkles', '', 'width:22px;height:22px')}<span class="row-l">Crear pieza propia</span></button>
@@ -178,6 +200,7 @@ function wire(page, root) {
   root.addEventListener('keydown', e => { const r = e.target.closest('[data-type],[data-buf]'); if (r && e.target === r && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); r.click(); } });
   on('addBuf', () => buffetSheet());
   on('scanRow', () => app.scanIntro());
+  on('findRow', () => openFinder());
   on('newType', () => customTypeSheet());
   on('resetCosts', () => { S.types.forEach(t => { const d = DEFAULT_TYPES.find(x => x.id === t.id); if (d) { t.cost = d.cost; t.carta = d.carta; } }); save(); app.buildGrid(); renderSettings(); hud('Costes restaurados'); });
   on('expData', () => app.exportBackup());
@@ -196,10 +219,12 @@ export function buffetSheet(id, preset = {}) {
       ${PRICE_SLOTS.map(s => `<label class="row"><span class="row-l" style="flex:0 0 auto">${s.name}<span class="sub">${s.d}</span></span><input class="row-in num" id="bf-${s.id}" inputmode="decimal" value="${fmtDec(p[s.id])}"><span class="row-v">${CURRENCIES[S.settings.cur]}</span></label>`).join('')}
     </div></div>
     <div class="group"><div class="row"><span class="row-l">Usar como habitual</span>${sw('bfDef', !b || b.id === S.buffetId)}</div></div>
+    ${b ? `<div class="group"><button class="row nav-row" id="bfMenu" style="--ins:58px"><span class="ri" style="--rc:#E5484D">${ui('book')}</span><span class="row-l">${menuCount(b.id) ? 'Su carta' : 'Añadir su carta'}<span class="sub">${menuCount(b.id) ? `${menuCount(b.id)} platos${b.useMenu === false ? ' · desactivada' : ''}` : 'Búscala o hazle una foto'}</span></span>${ui('chev', 'chev')}</button></div>` : ''}
     ${b && S.buffets.length > 1 ? '<button class="btn ghost" id="bfDel">Eliminar buffet</button>' : ''}`,
     mount(el) {
-      const d = $('#bfDel', el); if (d) twoStep(d, 'Toca otra vez para eliminar', () => { S.buffets = S.buffets.filter(x => x.id !== id); if (S.buffetId === id) S.buffetId = S.buffets[0].id; if (S.session.buffetId === id) S.session.buffetId = null; save(); closeSheet(); renderSettings(); app.updateCounter(); });
+      const d = $('#bfDel', el); if (d) twoStep(d, 'Toca otra vez para eliminar', () => { S.buffets = S.buffets.filter(x => x.id !== id); if (S.buffetId === id) S.buffetId = S.buffets[0].id; if (S.session.buffetId === id) S.session.buffetId = null; save(); closeSheet(); renderSettings(); app.buildGrid(); });
       if (!b && !preset.name) setTimeout(() => $('#bfName', el).focus(), 450);
+      const mn = $('#bfMenu', el); if (mn) mn.onclick = () => menuCount(b.id) ? menuSheet(b.id) : openFinder(b.name);
     },
     onOk(el) {
       const name = $('#bfName', el).value.trim() || 'Buffet';
@@ -208,21 +233,23 @@ export function buffetSheet(id, preset = {}) {
       if (b) { b.name = name; b.prices = prices; } else { bid = 'b' + Date.now().toString(36); S.buffets.push({id:bid, name, prices}); }
       if ($('#bfDef', el).checked) S.buffetId = bid;
       if (!S.session.start || !b) S.session.buffetId = bid;
-      save(); if (app.cur === 'set') renderSettings(); app.updateCounter(); hud(b ? 'Buffet guardado' : 'Buffet añadido');
+      save(); if (app.cur === 'set') renderSettings(); app.buildGrid(); hud(b ? 'Buffet guardado' : 'Buffet añadido');
     }});
 }
 // Selector rápido desde el contador
 export function buffetPicker() {
   const cur = currentBuffet(), slot = sessionSlot();
   openSheet({title:'¿Dónde comes hoy?', cancel:'Cerrar', body:`
-    <div class="group" id="bpList">${S.buffets.map(b => `<button class="row" data-pick="${b.id}"><span class="row-main"><span class="row-t">${esc(b.name)}</span><span class="row-d">${money(b.prices[slot])} · ${PRICE_SLOTS.find(s => s.id === slot).name.toLowerCase()}</span></span>${b.id === cur.id ? ui('check', 'chk') : ''}</button>`).join('')}
+    <button class="find-cta card" id="bpFind"><span class="fc-ill">${illu('carta')}</span><span class="fc-tx"><b>Buscar restaurante y su carta</b><span>Cuenta los platos de su carta, cada uno en su sección</span></span>${ui('chev', 'chev')}</button>
+    <div class="group" id="bpList">${S.buffets.map(b => `<button class="row" data-pick="${b.id}"><span class="row-main"><span class="row-t">${esc(b.name)}${menuCount(b.id) ? `<em class="tag carta">Carta · ${menuCount(b.id)}</em>` : ''}</span><span class="row-d">${money(b.prices[slot])} · ${PRICE_SLOTS.find(s => s.id === slot).name.toLowerCase()}</span></span>${b.id === cur.id ? ui('check', 'chk') : ''}</button>`).join('')}
       <button class="row accent" id="bpAdd">${ui('plus', '', 'width:22px;height:22px')}<span class="row-l">Añadir buffet</span></button></div>
     <div class="gsec"><div class="glabel">Precio de esta sesión</div><div class="group"><div class="row">${seg('slot', [['auto', 'Auto'], ...PRICE_SLOTS.map(s => [s.id, s.name])], S.session.slot || 'auto')}</div></div>
       <p class="gfoot">${S.session.priceOverride != null ? `Ahora mismo usas el precio del ticket: ${money(S.session.priceOverride)}. ` : ''}«Auto» elige mediodía, noche o fin de semana según la hora.</p></div>
     <button class="btn plain" id="bpScan">${ui('camera')}Escanear ticket</button>
     ${S.session.priceOverride != null ? '<button class="btn ghost" id="bpClear" style="color:var(--accent)">Volver al precio del buffet</button>' : ''}`,
     mount(el) {
-      $('#bpList', el).addEventListener('click', e => { const r = e.target.closest('[data-pick]'); if (!r) return; S.session.buffetId = r.dataset.pick; S.buffetId = r.dataset.pick; save(); feedback('tick'); closeSheet(); app.updateCounter(); hud('Buffet: ' + currentBuffet().name); });
+      $('#bpList', el).addEventListener('click', e => { const r = e.target.closest('[data-pick]'); if (!r) return; S.session.buffetId = r.dataset.pick; S.buffetId = r.dataset.pick; save(); feedback('tick'); closeSheet(); app.buildGrid(); hud('Buffet: ' + currentBuffet().name); });
+      $('#bpFind', el).onclick = () => openFinder();
       $('#bpAdd', el).onclick = () => buffetSheet();
       bindSeg(el, 'slot', v => { S.session.slot = v === 'auto' ? null : v; save(); app.updateCounter(); });
       $('#bpScan', el).onclick = () => app.scanTicket();
@@ -264,14 +291,15 @@ const algToggles = sel => `<div class="algs" id="algs">${ALLERGENS.map(a => `<bu
 const bindAlg = (el, arr) => $('#algs', el).addEventListener('click', e => { const b = e.target.closest('[data-al]'); if (!b) return; const a = b.dataset.al, i = arr.indexOf(a); if (i >= 0) arr.splice(i, 1); else arr.push(a); b.classList.toggle('on', i < 0); b.setAttribute('aria-pressed', i < 0); feedback('tick'); });
 export function typeSheet(k) {
   const t = typeById(k); if (!t) return;
-  if (t.tpl) return customTypeSheet(k);
-  const def = DEFAULT_TYPES.find(x => x.id === k);
+  if (t.tpl && !t.menu) return customTypeSheet(k);
+  // Platos de una carta: los valores de partida son los de la pieza parecida del catálogo
+  const def = DEFAULT_TYPES.find(x => x.id === k) || (t.menu ? null : DEFAULT_TYPES[0]);
   let kcal = t.kcal; const al = [...(t.al || [])];
   const mac = () => macroOf({...t, kcal});
   openSheet({title:'Pieza', ok:'Guardar', body:`
     <div class="sh-hero">${icon(k, 'big-ic')}<p>${CATS.find(c => c.id === t.cat).name} · 1 ${t.unit}</p></div>
     <div class="group">
-      <label class="row"><span class="row-l" style="flex:0 0 auto">Nombre</span><input class="row-in" id="tpName" maxlength="20" value="${esc(t.name)}" autocomplete="off"></label>
+      <label class="row"><span class="row-l" style="flex:0 0 auto">Nombre</span><input class="row-in" id="tpName" maxlength="${t.menu ? 40 : 20}" value="${esc(t.name)}" autocomplete="off"></label>
       <label class="row"><span class="row-l" style="flex:0 0 auto">Coste real</span><input class="row-in num" id="tpCost" inputmode="decimal" value="${fmtDec(t.cost)}"><span class="row-v">${CURRENCIES[S.settings.cur]}</span></label>
       <label class="row"><span class="row-l" style="flex:0 0 auto">Precio en carta</span><input class="row-in num" id="tpCarta" inputmode="decimal" value="${fmtDec(t.carta)}"><span class="row-v">${CURRENCIES[S.settings.cur]}</span></label>
       <div class="row"><span class="row-l">Calorías</span><span class="row-v num" id="tpK"></span>${stepper('tp-k')}</div>
@@ -280,17 +308,17 @@ export function typeSheet(k) {
     </div>
     <div class="gsec"><div class="glabel">Nutrición por ${t.unit}</div><div class="group pad"><div class="macros" id="tpMac"></div></div></div>
     <div class="gsec"><div class="glabel">Alérgenos</div><div class="group pad">${algToggles(al)}</div><p class="gfoot">Orientativo. Pregunta siempre en el restaurante.</p></div>
-    <div class="group"><button class="row accent" id="tpReset" style="justify-content:center">Restaurar valores por defecto</button></div>
-    <p class="gfoot" style="margin-top:-4px">Por defecto: ${esc(def.name)}, ${money(def.cost)} de coste, ${money(def.carta)} en carta y ${def.kcal} kcal.</p>`,
+    ${def ? `<div class="group"><button class="row accent" id="tpReset" style="justify-content:center">Restaurar valores por defecto</button></div>
+    <p class="gfoot" style="margin-top:-4px">Por defecto: ${esc(def.name)}, ${money(def.cost)} de coste, ${money(def.carta)} en carta y ${def.kcal} kcal.</p>` : `<p class="gfoot">Plato de la carta de ${esc((S.buffets.find(b => b.id === t.menu) || {}).name || 'un restaurante')}${t.desc ? `: ${esc(t.desc)}` : ''}. Coste y calorías estimados a partir de la pieza más parecida.</p>`}`,
     mount(el) {
       const paint = () => { $('#tpK', el).textContent = `${kcal} kcal`; const m = mac(); $('#tpMac', el).innerHTML = [['Proteínas', m[0], '#30A46C'], ['Hidratos', m[1], '#F5A524'], ['Grasas', m[2], '#3E7BFA']].map(([l, g, c]) => `<div class="mac"><span>${l}</span><b>${(Math.round(g * 10) / 10).toString().replace('.', ',')} g</b><i><em style="width:${Math.min(100, g / Math.max(1, m[0] + m[1] + m[2]) * 100)}%;background:${c}"></em></i></div>`).join(''); };
       bindStepper(el, 'tp-k', dir => { kcal = Math.max(0, Math.min(1200, kcal + dir * 5)); paint(); });
       bindAlg(el, al);
-      $('#tpReset', el).onclick = () => { $('#tpName', el).value = def.name; $('#tpCost', el).value = fmtDec(def.cost); $('#tpCarta', el).value = fmtDec(def.carta); kcal = def.kcal; al.splice(0, al.length, ...def.al); $$('[data-al]', el).forEach(b => b.classList.toggle('on', al.includes(b.dataset.al))); paint(); feedback('tick'); };
+      if (def) $('#tpReset', el).onclick = () => { $('#tpName', el).value = def.name; $('#tpCost', el).value = fmtDec(def.cost); $('#tpCarta', el).value = fmtDec(def.carta); kcal = def.kcal; al.splice(0, al.length, ...def.al); $$('[data-al]', el).forEach(b => b.classList.toggle('on', al.includes(b.dataset.al))); paint(); feedback('tick'); };
       paint();
     },
     onOk(el) {
-      t.name = $('#tpName', el).value.trim() || def.name; t.kcal = kcal; t.on = $('#tpOn', el).checked; t.fav = $('#tpFav', el).checked; t.al = al;
+      t.name = $('#tpName', el).value.trim() || (def ? def.name : t.name); t.kcal = kcal; t.on = $('#tpOn', el).checked; t.fav = $('#tpFav', el).checked; t.al = al;
       t.cost = Math.max(0, parseNum($('#tpCost', el).value)); t.carta = Math.max(0, parseNum($('#tpCarta', el).value));
       save(); app.buildGrid(); if (app.cur === 'set') renderSettings();
     }});
@@ -303,7 +331,7 @@ export function customTypeSheet(k) {
   openSheet({title:t ? 'Tu pieza' : 'Nueva pieza', ok:t ? 'Guardar' : 'Crear', body:`
     <div class="sh-hero" id="ctPrev">${prev()}</div>
     <div class="group"><label class="row"><span class="row-l" style="flex:0 0 auto">Nombre</span><input class="row-in" id="ctName" maxlength="20" placeholder="Por ejemplo, Nigiri de vieira" value="${esc(t ? t.name : '')}" autocomplete="off"></label></div>
-    <div class="gsec"><div class="glabel">Forma</div><div class="picks" id="ctTpl">${Object.keys(TPL).map(id => `<button class="pick${id === tpl ? ' on' : ''}" data-tpl="${id}"><svg viewBox="0 0 48 48" aria-hidden="true">${TPL[id](color)}</svg>${({nigiri:'Nigiri', sashimi:'Sashimi', maki:'Maki', gunkan:'Gunkan', brocheta:'Brocheta', bol:'Bol', bola:'Postre', roll:'Roll'})[id]}</button>`).join('')}</div></div>
+    <div class="gsec"><div class="glabel">Forma</div><div class="picks" id="ctTpl">${Object.keys(TPL).map(id => `<button class="pick${id === tpl ? ' on' : ''}" data-tpl="${id}"><svg viewBox="0 0 48 48" aria-hidden="true">${TPL[id](color)}</svg>${({nigiri:'Nigiri', sashimi:'Sashimi', maki:'Maki', gunkan:'Gunkan', brocheta:'Brocheta', bol:'Bol', bola:'Postre', roll:'Roll', uramaki:'Uramaki', temaki:'Temaki'})[id]}</button>`).join('')}</div></div>
     <div class="gsec"><div class="glabel">Ingrediente principal</div><div class="group pad"><div class="swatches" id="ctCol">${FOOD_COLORS.map(f => `<button class="swc${f.c === color ? ' on' : ''}" data-c="${f.c}" style="--c:${f.c}" aria-label="${f.n}" title="${f.n}"></button>`).join('')}</div></div></div>
     <div class="gsec"><div class="glabel">Categoría</div><div class="group"><div class="row">${seg('ctCat', CATS.map(c => [c.id, c.short]), cat)}</div></div></div>
     <div class="group">

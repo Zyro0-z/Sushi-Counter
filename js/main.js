@@ -8,13 +8,14 @@ import {initHero, updateTime, mascotTick, resetHeroCache} from './ui/hero.js';
 import {buildGrid, renderChips, updateCounter, renderMini, checkAll, undo, logSheet, initCards, initChips, undoStack} from './ui/counter.js';
 import {renderRetos, updateBadge, chSheet, achSheet, newChSheet, profileSheet, setRetoSeg} from './ui/retos.js';
 import {renderHistory, histSheet, finishSheet} from './ui/history.js';
-import {renderSettings, settingsBack, settingsRoot, dinerSheet, typeSheet, buffetPicker} from './ui/settings.js';
+import {renderSettings, settingsBack, settingsRoot, dinerSheet, typeSheet, buffetPicker, initSwipeBack} from './ui/settings.js';
 import {roulette, duelSetup, trialSetup, trialRender, trialCheck} from './ui/play.js';
 import {shareSheet, remoteSheet, remoteDiners, sharePush, connect, joinFromURL} from './ui/share.js';
 import {scanTicket} from './ui/scan.js';
 import {exportBackup, importBackup, exportCSV, shareCard, backupNudge} from './ui/files.js';
 import {showIntro} from './ui/intro.js';
 import {openHub, renderPlay, guideSheet, scanIntro} from './ui/hub.js';
+import {openFinder, menuSheet, menuCount} from './ui/carta.js';
 
 /* ---------- Pantalla encendida ---------- */
 let wake = null;
@@ -23,24 +24,6 @@ async function keepAwake() {
   try { wake = await navigator.wakeLock.request('screen'); wake.addEventListener('release', () => { wake = null; }); } catch (e) {}
 }
 function releaseAwake() { if (wake) { try { wake.release(); } catch (e) {} wake = null; } }
-
-/* ---------- Pantalla completa en la app instalada de iPhone ----------
-   En modo app, iOS a veces deja la ventana más corta que la pantalla y aparece una franja vacía abajo.
-   Se mide la diferencia y se estira la app hasta el borde. */
-function fitScreen() {
-  const r = document.documentElement, ios = /iP(hone|od|ad)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  const standalone = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
-  if (!ios || !standalone) return;
-  const portrait = innerHeight >= innerWidth, H = portrait ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
-  const gap = Math.round(H - innerHeight);
-  if (gap > 2 && gap < 220) {
-    r.dataset.fit = ''; r.style.setProperty('--app-h', H + 'px'); r.style.setProperty('--gapb', gap + 'px');
-    // Si iOS no informa del margen inferior, se reserva el de la barra de inicio
-    const probe = document.createElement('div'); probe.style.cssText = 'position:fixed;bottom:0;height:env(safe-area-inset-bottom,0px);visibility:hidden';
-    document.body.appendChild(probe); const sb = probe.offsetHeight; probe.remove();
-    if (sb < 1 && H >= 800 && portrait) r.style.setProperty('--sb', '34px'); else r.style.removeProperty('--sb');
-  } else { delete r.dataset.fit; r.style.removeProperty('--app-h'); r.style.removeProperty('--gapb'); r.style.removeProperty('--sb'); }
-}
 
 /* ---------- Coste real: explicación ---------- */
 function billInfo() {
@@ -60,7 +43,7 @@ function go(tab) {
   app.cur = tab; document.body.dataset.tab = tab;
   $$('.view').forEach(x => { x.hidden = x !== v; });
   $$('.tb').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === tab));
-  $('#tbPill').style.setProperty('--i', Object.keys(TABS).indexOf(tab));
+  $('#tbPill').style.setProperty('--i', Object.keys(TABS).indexOf(tab)); $('.tabbar').style.setProperty('--ti', Object.keys(TABS).indexOf(tab)); setMin(false);
   if (tab === 'ch') { renderRetos(); app.unseen = 0; }
   if (tab === 'hist') renderHistory();
   if (tab === 'set') renderSettings();
@@ -68,8 +51,12 @@ function go(tab) {
   v.classList.remove('enter'); void v.offsetWidth; v.classList.add('enter');
   onScroll.call(v);
 }
+// Barra de pestañas compacta: se recoge al bajar y vuelve al subir o al llegar arriba
+function setMin(on) { if (document.body.classList.contains('tb-min') !== on) document.body.classList.toggle('tb-min', on); }
 function onScroll() {
-  this.querySelector('.nav').classList.toggle('scrolled', this.scrollTop > 30);
+  const y = this.scrollTop, dy = y - (this._ly || 0); this._ly = y;
+  if (y < 90) setMin(false); else if (dy > 8) setMin(true); else if (dy < -14) setMin(false);
+  this.querySelector('.nav').classList.toggle('scrolled', y > 30);
   if (this.id === 'v-count') spy();
 }
 let spyLock = 0;
@@ -118,6 +105,7 @@ function shortcuts() {
   else if (a === 'historial' || a === 'hist') go('hist');
   else if (a === 'ruleta') setTimeout(roulette, 400);
   else if (a === 'juegos') setTimeout(openHub, 400);
+  else if (a === 'carta') setTimeout(() => openFinder(), 400);
   else if (a === 'empezar' || a === 'start') setTimeout(buffetPicker, 400);
   if (p.get('a')) history.replaceState(null, '', location.pathname);
 }
@@ -128,13 +116,12 @@ Object.assign(app, {
   dinerSheet, typeSheet, billInfo, profileSheet, shareSheet, remoteSheet, remoteDiners, remoteCount:() => remoteDiners().length, sharePush,
   exportCSV, exportBackup, importBackup, shareCard, backupNudge, showIntro, scanTicket, duelSetup, trialRender, trialCheck,
   keepAwake, releaseAwake, resetHero:resetHeroCache, sessionStarted:keepAwake,
-  roulette, trialSetup, buffetPicker, logSheet, openHub, guideSheet, scanIntro, renderPlay,
+  roulette, trialSetup, buffetPicker, logSheet, openHub, guideSheet, scanIntro, renderPlay, openFinder, menuSheet, menuCount,
 });
 
 /* ---------- Arranque ---------- */
 function boot() {
   document.body.dataset.tab = 'count';
-  fitScreen(); addEventListener('resize', fitScreen); addEventListener('orientationchange', () => setTimeout(fitScreen, 350)); addEventListener('pageshow', fitScreen);
   measureText(); applyLook(); initSheet();
   $$('.tb').forEach(b => { const [ic, l] = TABS[b.dataset.tab]; b.innerHTML = `${ui(ic)}<span>${l}</span>`; });
   document.querySelector('svg defs').insertAdjacentHTML('beforeend', ICON_DEFS);
@@ -145,7 +132,7 @@ function boot() {
   $('#buffetLine').onclick = buffetPicker;
   $('#chBody').addEventListener('click', e => { const r = e.target.closest('[data-ch]'); if (r) return chSheet(r.dataset.ch); const a = e.target.closest('[data-ach]'); if (a) achSheet(a.dataset.ach); });
   $('#histBody').addEventListener('click', e => { const r = e.target.closest('[data-h]'); if (r) histSheet(r.dataset.h); });
-  $('.tabbar').addEventListener('click', e => { const b = e.target.closest('.tb'); if (b) { go(b.dataset.tab); feedback('tick'); } });
+  $('.tabbar').addEventListener('click', e => { if (document.body.classList.contains('tb-min')) { setMin(false); feedback('tick'); return; } const b = e.target.closest('.tb'); if (b) { go(b.dataset.tab); feedback('tick'); } });
   $$('.view').forEach(v => v.addEventListener('scroll', onScroll, {passive:true}));
   // Evita desplazamientos laterales provocados por el foco o scrollIntoView
   $$('.view, .stage, .app').forEach(el => el.addEventListener('scroll', () => { if (el.scrollLeft) el.scrollLeft = 0; }, {passive:true}));
@@ -161,7 +148,7 @@ function boot() {
   matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', applyLook);
   document.addEventListener('touchstart', () => {}, {passive:true});
 
-  initHero(); initCards(); initChips(); initShine();
+  initHero(); initCards(); initChips(); initShine(); initSwipeBack();
   renderChips(); buildGrid(); renderPlay();
   joinFromURL(); connect();
   shortcuts();

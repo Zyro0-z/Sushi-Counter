@@ -27,7 +27,7 @@ export function fresh() {
     v:VERSION,
     settings:{
       cur:'EUR', goal:40, theme:'system', skin:'ios', accent:'sake', layout:'compact',
-      sound:'theme', notify:'all', haptics:true, awake:true, mascot:true, motion:'full', textSize:'auto', contrast:false,
+      sound:'theme', notify:'all', menuHint:true, haptics:true, awake:true, mascot:true, motion:'full', textSize:'auto', contrast:false,
       allergens:[], allergenMode:'mark', kcalAlert:false, kcalLimit:2000, title:null,
       introSeen:false, hintSwipe:false, lastBackup:0, tiltAsked:false,
     },

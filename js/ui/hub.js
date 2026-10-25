@@ -46,6 +46,7 @@ const TILES = () => {
     {sec:'Para la mesa', items:[
       {k:'mesa', t:'Mesa compartida', d:'Cada uno cuenta en su móvil y lo veis todo junto', c:'#0A84FF', st:code ? `Mesa ${code}` : '', fn:() => app.shareSheet()},
       {k:'ticket', t:'Escanear ticket', d:'Haz una foto y calcula el precio por persona', c:'#30A46C', fn:scanIntro},
+      {k:'carta', t:'Carta del restaurante', d:app.menuCount(b.id) ? `${b.name}: ${app.menuCount(b.id)} platos` : 'Búscalo y cuenta los platos de su carta', c:'#E5484D', st:app.menuCount(b.id) ? 'Activa' : '', fn:() => app.menuCount(b.id) ? app.menuSheet(b.id) : app.openFinder()},
       {k:'buffet', t:'Restaurante y precio', d:b ? b.name : 'Elige dónde estás comiendo', c:'#8E5BD6', fn:() => app.buffetPicker()},
     ]},
     {sec:'Tu sesión', items:[
@@ -77,8 +78,10 @@ export function openHub() {
 let playKey = '';
 export function renderPlay() {
   const box = $('#play'); if (!box) return;
-  const tr = S.session.trial, code = S.share.code, key = `${!!tr}|${code}`;
+  const tr = S.session.trial, code = S.share.code, b = currentBuffet(), hasMenu = !!app.menuCount && app.menuCount(b.id) > 0;
+  const key = `${!!tr}|${code}|${b.id}|${hasMenu}|${S.settings.menuHint}`;
   if (key === playKey && box.firstChild) return; playKey = key;
+  renderMenuHint(!hasMenu && S.settings.menuHint !== false);
   const items = [
     ['ruleta', 'Ruleta', 'Qué pido', () => app.roulette()],
     ['duelo', 'Duelo', 'Uno contra uno', () => app.duelSetup()],
@@ -94,6 +97,15 @@ export function renderPlay() {
   };
 }
 
+/* ---------- Aviso para añadir la carta del restaurante ---------- */
+function renderMenuHint(show) {
+  const h = $('#menuHint'); if (!h) return;
+  h.hidden = !show; if (!show) return;
+  h.innerHTML = `<span class="mh-ill">${illu('carta')}</span><span class="mh-tx"><b>Cuenta con la carta del restaurante</b><span>Búscalo y añadimos sus platos: nigiri flambeado, maki frito…</span></span>
+    <span class="mh-go">${ui('search')}Buscar</span><button class="mh-x" id="mhX" aria-label="No volver a mostrar">${ui('x')}</button>`;
+  h.onclick = e => { if (e.target.closest('#mhX')) { S.settings.menuHint = false; save(); h.hidden = true; feedback('tick'); return; } feedback('tick'); app.openFinder(); };
+}
+
 /* ---------- Guía de uso ---------- */
 const GUIDE = [
   ['Sumar una pieza', 'Toca la pieza. Si pides varias iguales, desliza el dedo hacia la derecha sobre ella: cuanto más lejos, más suma (hasta 4).', () => `<span class="gd-pc">${icon('nigiri')}<i class="gd-badge">+1</i></span>`],
@@ -103,10 +115,11 @@ const GUIDE = [
   ['Misiones, desafíos y logros', 'Cada sesión trae 3 misiones nuevas. Los desafíos y logros se consiguen comiendo. Todo da puntos y te hace subir de nivel.', () => `<span class="gd-med">${illu('reloj')}</span>`],
   ['Terminar la comida', 'Al acabar, toca Terminar. Se guarda en el Historial con lo que comiste, lo que cuesta de verdad y si has amortizado el buffet.', () => `<span class="gd-med">${illu('registro')}</span>`],
   ['Juegos y herramientas', 'Toca el botón de cuadraditos arriba a la derecha: ruleta, duelo, contrarreloj, mesa compartida y escanear el ticket.', () => `<span class="gd-grid">${ui('grid')}</span>`],
+  ['La carta del restaurante', 'Toca el nombre del buffet, debajo de «Contador», y busca el restaurante: añadimos los platos de su carta, cada uno en su sección. También puedes hacerle una foto a la carta.', () => `<span class="gd-med">${illu('carta')}</span>`],
 ];
 export function guideSheet() {
   openSheet({title:'Guía de uso', cancel:'Cerrar', cls:'hub-sheet', body:`
-    <div class="sh-hero">${illu('ayuda', 'hero-illu')}<h4>Cómo usar el contador</h4><p>Siete cosas y lo sabes todo. Puedes volver aquí desde Ajustes.</p></div>
+    <div class="sh-hero">${illu('ayuda', 'hero-illu')}<h4>Cómo usar el contador</h4><p>Ocho cosas y lo sabes todo. Puedes volver aquí desde Ajustes.</p></div>
     <ol class="guide">${GUIDE.map(([t, d, art], i) => `<li class="card"><span class="gd-art" aria-hidden="true">${art()}</span><span class="gd-tx"><small>Paso ${i + 1}</small><b>${t}</b><span>${d}</span></span></li>`).join('')}</ol>
     <button class="btn plain" id="gdIntro">${ui('play')}Ver la bienvenida otra vez</button>`,
     mount(el) { $('#gdIntro', el).onclick = () => { closeSheet(); setTimeout(() => app.showIntro(true), 450); }; }});

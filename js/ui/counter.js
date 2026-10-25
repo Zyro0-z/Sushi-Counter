@@ -2,7 +2,7 @@
 import {S, save} from '../store.js';
 import {CATS, PRICE_SLOTS} from '../catalog.js';
 import {ui, UI, TIER_XP} from '../icons.js';
-import {diner, me, typeById, tname, initial, money, hhmm, ctx, visibleTypes, hasAllergen, allCh, isDone, evalCh,
+import {diner, me, typeById, tname, initial, money, hhmm, ctx, visibleTypes, menuBuffet, hasAllergen, allCh, isDone, evalCh,
   missionsOf, mProg, mText, lifetime, ACH, TITLES, titleOk, level, sum, currentBuffet, priceNow, sessionSlot, nf0} from '../logic.js';
 import {$, $$, esc, app, icon, Odo, openSheet, closeSheet, popMenu, enqueue, mIcon} from './common.js';
 import {feedback, hud, flyTo, reduced, announce} from '../fx.js';
@@ -25,9 +25,13 @@ function cardHTML(t) {
     <span class="pc-plus" aria-hidden="true">${ui('plus')}</span></div>`;
 }
 export function buildGrid() {
-  const vis = visibleTypes(), favs = vis.filter(t => t.fav), groups = [];
+  const vis = visibleTypes(), favs = vis.filter(t => t.fav), groups = [], menu = menuBuffet();
   if (favs.length) groups.push({id:'fav', name:'Favoritas', short:'Favoritas', list:favs});
-  CATS.forEach(c => { const l = vis.filter(t => t.cat === c.id); if (l.length) groups.push({...c, list:l}); });
+  if (menu) {
+    // Carta del restaurante: sus propias secciones, con el color de plato de la categoría
+    vis.filter(t => t.menu).forEach(t => { let g = groups.find(x => x.sec === t.sec); if (!g) { const c = CATS.find(x => x.id === t.cat) || CATS[0]; groups.push(g = {id:'s' + groups.length, sec:t.sec, name:t.sec, short:t.sec.length > 16 ? t.sec.slice(0, 15) + '…' : t.sec, plate:c.plate, list:[]}); } g.list.push(t); });
+    if (menu.mix) CATS.forEach(c => { const l = vis.filter(t => !t.menu && t.cat === c.id); if (l.length) groups.push({...c, id:'d-' + c.id, name:c.name + ' (de serie)', list:l}); });
+  } else CATS.forEach(c => { const l = vis.filter(t => t.cat === c.id); if (l.length) groups.push({...c, list:l}); });
   const lay = S.settings.layout;
   $('#cats').innerHTML = groups.map(g => `<section class="catsec" data-cat="${g.id}"><h2 class="cat-h"><i style="background:${g.plate || 'var(--gold)'}"></i>${g.name}<span>${g.list.length}</span></h2><div class="grid ${lay}">${g.list.map(cardHTML).join('')}</div></section>`).join('')
     || `<div class="card empty"><b>No hay piezas visibles</b>Actívalas en Ajustes › Piezas.</div>`;
@@ -62,7 +66,7 @@ export function updateCounter() {
   }
   renderBill(c);
   const b = currentBuffet(), slot = PRICE_SLOTS.find(s => s.id === sessionSlot());
-  $('#buffetLine').innerHTML = `${esc(b.name)} · ${money(priceNow())}${S.session.priceOverride != null ? ' (ticket)' : ` · ${slot.name.toLowerCase()}`}${ui('chevD', 'bl-chev')}`;
+  $('#buffetLine').innerHTML = `${menuBuffet() ? `<em class="bl-carta">${ui('book')}Carta</em>` : ''}${esc(b.name)} · ${money(priceNow())}${S.session.priceOverride != null ? ' (ticket)' : ` · ${slot.name.toLowerCase()}`}${ui('chevD', 'bl-chev')}`;
   $('#btnUndo').disabled = !S.session.log.length && !undoStack.length;
   $('#btnFinish').disabled = !S.session.log.length;
   $$('.chip[data-id]').forEach(ch => { ch.querySelector('.chip-c').textContent = S.session.log.filter(e => e.d === ch.dataset.id).length; });

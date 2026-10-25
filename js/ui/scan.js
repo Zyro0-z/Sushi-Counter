@@ -13,11 +13,11 @@ function loadLib() {
   libP = new Promise((res, rej) => { const s = document.createElement('script'); s.src = LIB; s.onload = () => res(window.Tesseract); s.onerror = () => { libP = null; rej(new Error('lib')); }; document.head.appendChild(s); });
   return libP;
 }
-function prep(file) {
+function prep(file, max = 1600) {
   return new Promise((res, rej) => {
     const img = new Image(), url = URL.createObjectURL(file);
     img.onload = () => {
-      const k = Math.min(1, 1600 / Math.max(img.width, img.height)), c = document.createElement('canvas');
+      const k = Math.min(1, max / Math.max(img.width, img.height)), c = document.createElement('canvas');
       c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
       const x = c.getContext('2d'); x.filter = 'grayscale(1) contrast(1.35)'; x.drawImage(img, 0, 0, c.width, c.height);
       URL.revokeObjectURL(url); res(c);
@@ -25,6 +25,18 @@ function prep(file) {
     img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('img')); };
     img.src = url;
   });
+}
+// Texto de una foto; también se usa para leer cartas (más resolución para la letra pequeña)
+export async function ocrFile(file, set = () => {}, max = 1600) {
+  const [T, canvas] = await Promise.all([loadLib(), prep(file, max)]);
+  const worker = await T.createWorker('spa', 1, {logger:m => { if (m.status === 'recognizing text') set('Leyendo el texto', .3 + m.progress * .7); else set('Cargando el lector', (m.progress || 0) * .3); }});
+  try { const {data} = await worker.recognize(canvas); return data.text || ''; } finally { worker.terminate(); }
+}
+export function pickImage(cb) {
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*'; inp.style.display = 'none';
+  document.body.appendChild(inp);
+  inp.onchange = () => { const f = inp.files[0]; inp.remove(); if (f) cb(f); };
+  inp.click();
 }
 export function scanTicket() {
   const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*'; inp.style.display = 'none';
@@ -37,11 +49,8 @@ async function read(file) {
     <div class="meter lg"><i id="ocrBar" style="width:4%"></i></div><p class="gfoot">La primera vez descarga el lector de texto (unos 5 MB). Después funciona más rápido.</p>`});
   let text = '';
   try {
-    const [T, canvas] = await Promise.all([loadLib(), prep(file)]);
     const set = (msg, p) => { const m = $('#ocrMsg'), b = $('#ocrBar'); if (m) m.textContent = msg; if (b && p != null) b.style.width = Math.max(4, p * 100) + '%'; };
-    const worker = await T.createWorker('spa', 1, {logger:m => { if (m.status === 'recognizing text') set('Leyendo el texto', .3 + m.progress * .7); else set('Cargando el lector', (m.progress || 0) * .3); }});
-    const {data} = await worker.recognize(canvas);
-    text = data.text || ''; worker.terminate();
+    text = await ocrFile(file, set);
   } catch (e) {
     hud('No se pudo leer el ticket. Escríbelo a mano.');
   }

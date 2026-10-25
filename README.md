@@ -23,6 +23,12 @@ Web app con aspecto de iOS para llevar la cuenta de lo que comes en un buffet de
 - Cinta kaiten animada, torre de platos con los colores de cada categoría y gráfica de ritmo.
 - Shari, la mascota: reacciona a tu ritmo, se duerme si paras y te da ideas.
 
+**La carta del restaurante**
+- Busca el restaurante por nombre o cerca de ti (OpenStreetMap), lee su carta desde su web o su PDF y añade sus platos al contador, cada uno en la sección de la carta.
+- Reconoce la pieza parecida (para el dibujo, el coste y las calorías) y los detalles: flambeado, crujiente, picante, con queso, con salsa, trufa…
+- Si la web no tiene la carta en texto: foto de la carta, enlace o texto pegado. También lee el precio del buffet si aparece.
+- Un «nigiri de salmón flambeado» de la carta cuenta como nigiri en los desafíos.
+
 **El dinero**
 - La cuenta real: lo que pagas, lo que cuestas en ingredientes y lo que valdría en carta.
 - Varios buffets con precio de mediodía, noche y fin de semana, elegido solo según la hora.
@@ -53,7 +59,8 @@ El coste de cada pieza es una estimación de ingredientes con precios de mayoris
 - El escáner de tickets descarga [Tesseract.js](https://tesseract.projectnaptha.com/) (unos 5 MB) la primera vez.
 - Safari en iPhone no permite que las webs vibren ni muestra los accesos rápidos del icono; en Android sí funcionan.
 - Los datos viven en el dispositivo. Usa la copia de seguridad para no perderlos.
-- En la app instalada en iPhone, iOS a veces deja la ventana más corta que la pantalla; la app lo detecta y se estira hasta el borde.
+- En la app instalada en iPhone con iOS 26, la ventana sale más corta que la pantalla ([WebKit 301108](https://bugs.webkit.org/show_bug.cgi?id=301108)). Se corrige con un alto mínimo en `html` para que iOS dé la ventana completa.
+- La carta se lee con [r.jina.ai](https://jina.ai/reader) y, si falla, con [allorigins](https://allorigins.win); los PDF se abren con [PDF.js](https://mozilla.github.io/pdf.js/). Muchas webs tienen la carta solo en foto: para esas está la cámara.
 
 ## Desarrollo
 
@@ -71,6 +78,7 @@ npm test       # pruebas de la lógica con node --test
 | `js/catalog.js` | Piezas, costes, alérgenos, nutrición y temas |
 | `js/store.js` | Estado guardado y migraciones |
 | `js/logic.js` | Cálculos, retos, logros, misiones y estadísticas |
+| `js/menu.js` | Lectura de cartas: secciones, platos, detalles y precios |
 | `js/art.js` | Ilustraciones de comida, de los juegos y mascota |
 | `js/icons.js` | Iconos de interfaz, alérgenos y medallas |
 | `js/fx.js` | Sonidos, vibración y partículas |

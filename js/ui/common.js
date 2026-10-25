@@ -12,7 +12,8 @@ export const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;', '<':'&
 // Registro para llamadas entre pantallas sin dependencias circulares
 export const app = {cur:'count'};
 
-export const icon = (k, cls = '', st = '') => `<svg viewBox="0 0 48 48" class="pi ${cls}" aria-hidden="true"${ICON_ANIM[k] ? ` data-anim="${ICON_ANIM[k]}"` : ''}${st ? ` style="${st}"` : ''}>${iconInner(k, typeById(k))}</svg>`;
+const animOf = k => ICON_ANIM[k] || (typeById(k) && !typeById(k).tpl && ICON_ANIM[typeById(k).like]) || '';
+export const icon = (k, cls = '', st = '') => `<svg viewBox="0 0 48 48" class="pi ${cls}" aria-hidden="true"${animOf(k) ? ` data-anim="${animOf(k)}"` : ''}${st ? ` style="${st}"` : ''}>${iconInner(k, typeById(k))}</svg>`;
 export const iconRaw = k => iconInner(k, typeById(k));
 
 /* ---------- Odómetro ---------- */

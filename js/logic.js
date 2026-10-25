@@ -30,12 +30,14 @@ export const sortTypes = list => list.slice().sort((a, b) => (ORDER[a.id] ?? 999
 
 /* ---------- Piezas, alérgenos y nutrición ---------- */
 export const hasAllergen = t => (t.al || []).some(a => S.settings.allergens.includes(a));
-export const visibleTypes = () => sortTypes(S.types.filter(t => t.on && !t.deleted && !(S.settings.allergenMode === 'hide' && hasAllergen(t))));
+// Si el buffet actual tiene su carta importada (y está activada), se cuentan sus platos en lugar de las piezas de serie
+export const menuBuffet = () => { const b = currentBuffet(); return b && b.useMenu !== false && S.types.some(t => t.menu === b.id && !t.deleted) ? b : null; };
+export const visibleTypes = () => { const m = menuBuffet(); return sortTypes(S.types.filter(t => t.on && !t.deleted && (m ? t.menu === m.id || (m.mix && !t.menu) : !t.menu) && !(S.settings.allergenMode === 'hide' && hasAllergen(t)))); };
 export const catOf = k => typeById(k)?.cat;
 const defOf = k => DEFAULT_TYPES.find(d => d.id === k);
 export function macroOf(t) {
   if (!t) return [0, 0, 0];
-  const def = defOf(t.id);
+  const def = defOf(t.id) || (t.mac ? {kcal:t.kcal, mac:t.mac} : null);
   if (def && def.mac) { const r = def.kcal ? t.kcal / def.kcal : 1; return def.mac.map(v => v * r); }
   return [t.kcal * .14 / 4, t.kcal * .58 / 4, t.kcal * .28 / 9];
 }
@@ -47,9 +49,10 @@ export const countIn = (by, ids) => ids.reduce((a, k) => a + (by[k] || 0), 0);
 export function counts(dId) { const c = {}; for (const e of S.session.log) if (!dId || e.d === dId) c[e.k] = (c[e.k] || 0) + 1; return c; }
 export function ctx(id) {
   const log = S.session.log.filter(e => e.d === id);
-  const by = {}, cat = {}; log.forEach(e => { by[e.k] = (by[e.k] || 0) + 1; const c = catOf(e.k); cat[c] = (cat[c] || 0) + 1; });
+  // bb: cuenta por pieza del catálogo, para que un "nigiri flambeado" de la carta cuente como nigiri en los desafíos
+  const by = {}, bb = {}, cat = {}; log.forEach(e => { by[e.k] = (by[e.k] || 0) + 1; const b = typeById(e.k)?.base || e.k; bb[b] = (bb[b] || 0) + 1; const c = catOf(e.k); cat[c] = (cat[c] || 0) + 1; });
   const el = S.session.start ? (Date.now() - S.session.start) / 60000 : 0;
-  return {log, by, cat, total:log.length, distinct:Object.keys(by).length, el, cost:costOf(by), carta:cartaOf(by), kcal:kcalOf(by)};
+  return {log, by, bb, cat, total:log.length, distinct:Object.keys(by).length, el, cost:costOf(by), carta:cartaOf(by), kcal:kcalOf(by)};
 }
 export function bestWindow(log, ms) { let best = 0, j = 0; for (let i = 0; i < log.length; i++) { while (log[i].t - log[j].t > ms) j++; best = Math.max(best, i - j + 1); } return best; }
 export function noRepeatRun(log) { let best = 0, j = 0; const seen = new Map(); for (let i = 0; i < log.length; i++) { const k = log[i].k; if (seen.has(k) && seen.get(k) >= j) j = seen.get(k) + 1; seen.set(k, i); best = Math.max(best, i - j + 1); } return best; }
@@ -83,16 +86,16 @@ export const CH = [
   {id:'coste5', t:'Le duele un poco', d:() => `Cuesta ${money(5, 0)} en ingredientes al restaurante`, tier:'bronze', g:{p:'down'}, f:c => [c.cost, 5, `${money(Math.min(c.cost, 5))} de ${money(5, 0)}`]},
   {id:'coste10', t:'Pesadilla del dueño', d:() => `Cuesta ${money(10, 0)} en ingredientes`, tier:'gold', g:{p:'down'}, f:c => [c.cost, 10, `${money(Math.min(c.cost, 10))} de ${money(10, 0)}`]},
   {id:'ruina', t:'A pérdidas', d:'Que tus ingredientes cuesten más que el buffet', tier:'plat', g:{p:'gem'}, f:c => { const p = priceNow(); return [c.cost, p, `${money(Math.min(c.cost, p))} de ${money(p)}`]; }},
-  {id:'purista', t:'Purista', d:'15 láminas de sashimi', tier:'silver', g:{icon:'sashimi'}, f:c => [countIn(c.by, ['sashimi', 'sashimi_atun']), 15]},
-  {id:'nigirista', t:'Nigirista', d:'20 nigiris de cualquier tipo', tier:'silver', g:{icon:'nigiri'}, f:c => [countIn(c.by, ['nigiri', 'nigiri_atun', 'nigiri_anguila', 'ebi']), 20]},
-  {id:'atunero', t:'Atunero', d:'10 de atún (nigiri, sashimi o tataki)', tier:'silver', g:{icon:'nigiri_atun'}, f:c => [countIn(c.by, ['nigiri_atun', 'sashimi_atun', 'tataki']), 10]},
-  {id:'unagi', t:'Unagi lover', d:'6 nigiris de anguila', tier:'bronze', g:{icon:'nigiri_anguila'}, f:c => [c.by.nigiri_anguila || 0, 6]},
+  {id:'purista', t:'Purista', d:'15 láminas de sashimi', tier:'silver', g:{icon:'sashimi'}, f:c => [countIn(c.bb, ['sashimi', 'sashimi_atun', 'sashimi_x']), 15]},
+  {id:'nigirista', t:'Nigirista', d:'20 nigiris de cualquier tipo', tier:'silver', g:{icon:'nigiri'}, f:c => [countIn(c.bb, ['nigiri', 'nigiri_atun', 'nigiri_anguila', 'ebi', 'nigiri_x']), 20]},
+  {id:'atunero', t:'Atunero', d:'10 de atún (nigiri, sashimi o tataki)', tier:'silver', g:{icon:'nigiri_atun'}, f:c => [countIn(c.bb, ['nigiri_atun', 'sashimi_atun', 'tataki']), 10]},
+  {id:'unagi', t:'Unagi lover', d:'6 nigiris de anguila', tier:'bronze', g:{icon:'nigiri_anguila'}, f:c => [c.bb.nigiri_anguila || 0, 6]},
   {id:'rollero', t:'Rollero', d:'30 piezas de rolls', tier:'silver', g:{icon:'uramaki'}, f:c => [c.cat.roll || 0, 30]},
-  {id:'dragon', t:'Domador de dragones', d:'8 piezas de dragon roll', tier:'bronze', g:{icon:'dragon'}, f:c => [c.by.dragon || 0, 8]},
-  {id:'gyoza', t:'Maestro gyoza', d:'12 gyozas', tier:'bronze', g:{icon:'gyoza'}, f:c => [c.by.gyoza || 0, 12]},
-  {id:'tempura', t:'Crujiente', d:'10 tempuras de langostino', tier:'silver', g:{icon:'tempura'}, f:c => [c.by.tempura || 0, 10]},
-  {id:'pollo', t:'Corral japonés', d:'6 de pollo (teriyaki o karaage)', tier:'bronze', g:{icon:'pollo_teriyaki'}, f:c => [countIn(c.by, ['pollo_teriyaki', 'karaage']), 6]},
-  {id:'pato', t:'Pato laqueado', d:'3 crepes de pato pekín', tier:'silver', g:{icon:'pato'}, f:c => [c.by.pato || 0, 3]},
+  {id:'dragon', t:'Domador de dragones', d:'8 piezas de dragon roll', tier:'bronze', g:{icon:'dragon'}, f:c => [c.bb.dragon || 0, 8]},
+  {id:'gyoza', t:'Maestro gyoza', d:'12 gyozas', tier:'bronze', g:{icon:'gyoza'}, f:c => [c.bb.gyoza || 0, 12]},
+  {id:'tempura', t:'Crujiente', d:'10 tempuras de langostino', tier:'silver', g:{icon:'tempura'}, f:c => [c.bb.tempura || 0, 10]},
+  {id:'pollo', t:'Corral japonés', d:'6 de pollo (teriyaki o karaage)', tier:'bronze', g:{icon:'pollo_teriyaki'}, f:c => [countIn(c.bb, ['pollo_teriyaki', 'karaage']), 6]},
+  {id:'pato', t:'Pato laqueado', d:'3 crepes de pato pekín', tier:'silver', g:{icon:'pato'}, f:c => [c.bb.pato || 0, 3]},
   {id:'caliente', t:'Fuego en la mesa', d:'15 cosas calientes', tier:'silver', g:{p:'flame'}, f:c => [c.cat.hot || 0, 15]},
   {id:'ligero', t:'Empieza ligero', d:'Lo primero: miso, edamame o wakame', tier:'bronze', g:{icon:'miso'}, f:c => { if (!c.log.length) return [0, 1, 'Aún no has empezado']; const ok = catOf(c.log[0].k) === 'side'; return [ok ? 1 : 0, 1, ok ? 'Hecho' : 'Ya empezaste con otra cosa']; }},
   {id:'hueco', t:'Siempre hay hueco', d:'Pide postre después de 40 piezas', tier:'bronze', g:{icon:'mochi'}, f:c => {
@@ -100,7 +103,7 @@ export const CH = [
     if (ok) return [1, 1, 'Hecho'];
     return c.total >= 40 ? [.95, 1, 'Ya puedes pedir el postre'] : [Math.min(c.total, 40) / 40 * .9, 1, `${c.total} de 40 piezas antes del postre`];
   }},
-  {id:'goloso', t:'Goloso', d:'3 postres distintos', tier:'bronze', g:{icon:'helado'}, f:c => { const n = ['mochi', 'helado', 'fruta'].filter(k => c.by[k]).length; return [n, 3, `${n} de 3 postres`]; }},
+  {id:'goloso', t:'Goloso', d:'3 postres distintos', tier:'bronze', g:{icon:'helado'}, f:c => { const n = Object.keys(c.by).filter(k => catOf(k) === 'dessert').length; return [n, 3, `${n} de 3 postres`]; }},
   {id:'banquete', t:'Banquete', d:'Supera las 2.000 kcal', tier:'silver', g:{p:'dish'}, f:c => [c.kcal, 2000, `${nf0(Math.min(c.kcal, 2000))} de 2.000 kcal`]},
   {id:'maraton', t:'Maratón', d:'90 minutos en la mesa', tier:'bronze', g:{p:'clock'}, f:c => [Math.floor(c.el), 90, `${Math.min(Math.floor(c.el), 90)} de 90 min`]},
   {id:'rey', t:'Rey de la mesa', d:'Saca 10 piezas de ventaja al resto', tier:'gold', g:{p:'crown'}, needs2:true, f:(c, id) => {
