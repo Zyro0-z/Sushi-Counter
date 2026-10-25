@@ -1,10 +1,10 @@
 // Guarda la app para que funcione sin conexión. Sube la versión al publicar cambios.
-const CACHE = 'sushi-v4';
+const CACHE = 'sushi-v5';
 const CORE = [
   './', './index.html', './manifest.webmanifest', './apple-touch-icon.png', './icon-512.png', './css/app.css',
-  './js/main.js', './js/store.js', './js/catalog.js', './js/icons.js', './js/logic.js', './js/fx.js',
+  './js/main.js', './js/store.js', './js/catalog.js', './js/icons.js', './js/art.js', './js/logic.js', './js/fx.js',
   './js/ui/common.js', './js/ui/hero.js', './js/ui/counter.js', './js/ui/retos.js', './js/ui/history.js', './js/ui/settings.js',
-  './js/ui/play.js', './js/ui/share.js', './js/ui/scan.js', './js/ui/files.js', './js/ui/intro.js',
+  './js/ui/play.js', './js/ui/share.js', './js/ui/scan.js', './js/ui/files.js', './js/ui/intro.js', './js/ui/hub.js',
 ];
 
 self.addEventListener('install', e => {

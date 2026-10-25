@@ -15,7 +15,7 @@ export function showIntro(force = false) {
       <section class="in-p"><div class="in-art art2"><b class="num">0,24 €</b><span>coste real de un nigiri de salmón</span><i><em></em></i></div>
         <h2>Descubre lo que cuesta de verdad</h2><p>Mira cuánto le cuestas al restaurante en ingredientes, cuánto valdría en carta y cuándo pierde dinero contigo.</p></section>
       <section class="in-p"><div class="in-art art3"><span class="in-m">${MASCOT}</span>${medal({tier:'gold', g:{p:'crown'}}, false)}${medal({tier:'silver', g:{p:'bolt'}}, false)}${medal({tier:'plat', g:{txt:'150'}}, false)}</div>
-        <h2>Juega con tu mesa</h2><p>Misiones, desafíos, logros, duelos, ruleta y contrarreloj. Shari, el nigiri, te acompaña y te da ideas.</p></section>
+        <h2>Juega con tu mesa</h2><p>Misiones, desafíos y logros. La ruleta, el duelo y la contrarreloj están en «Para jugar en la mesa» y en el botón de cuadraditos de arriba.</p></section>
     </div>
     <div class="in-foot"><div class="in-dots"><i class="on"></i><i></i><i></i></div><button class="btn" id="inNext">Siguiente</button><button class="in-skip" id="inSkip">Saltar</button></div>`;
   document.body.appendChild(ov);

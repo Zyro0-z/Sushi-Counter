@@ -65,7 +65,7 @@ test('migración desde la versión 2', () => {
   assert.equal(n.name, 'Nigiri salmón');
   assert.equal(n.cost, .3, 'conserva el coste editado');
   assert.ok(n.mac && n.al, 'añade nutrición y alérgenos');
-  assert.equal(s.types.length, 30);
+  assert.equal(s.types.length, 31);
   assert.equal(s.history[0].diners[0].me, true);
 });
 

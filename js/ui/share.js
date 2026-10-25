@@ -2,7 +2,8 @@
 // Cada móvil publica el recuento de sus comensales y escucha el de los demás.
 // Solo viaja nombre, color y recuento por pieza; el código de mesa hace de contraseña.
 import {S, save} from '../store.js';
-import {ui} from '../icons.js';
+import {ui, illu} from '../icons.js';
+import {howBlock} from './hub.js';
 import {counts, initial, tname, sum} from '../logic.js';
 import {$, esc, app, icon, openSheet, closeSheet} from './common.js';
 import {feedback, hud} from '../fx.js';
@@ -68,13 +69,14 @@ const linkFor = code => location.origin + location.pathname + '?mesa=' + code;
 export function shareSheet() {
   const code = S.share.code;
   openSheet({title:'Mesa compartida', cancel:'Cerrar', body: code ? `
-    <div class="sh-hero">${ui('cloud', '', 'width:56px;height:56px;color:var(--accent)')}<h4 class="code num">${code}</h4><p id="shStatus">${label()}</p></div>
+    <div class="sh-hero">${illu('mesa', 'hero-illu')}<h4 class="code num">${code}</h4><p id="shStatus">${label()}</p></div>
     <button class="btn" id="shCopy">${ui('share')}Invitar a la mesa</button>
     <div class="gsec"><div class="glabel">En otros móviles</div><div class="group">${remoteDiners().length ? remoteDiners().map(r => `<div class="row" style="--ins:62px"><span class="av md" style="--c:${r.color}">${esc(initial(r.name))}</span><span class="row-l">${esc(r.name)}</span><span class="h-tot">${r.total}</span></div>`).join('')
       : '<div class="empty" style="padding:18px"><b>Todavía nadie</b>Comparte el código o el enlace. Cuando otros sumen piezas aparecerán aquí y en el duelo.</div>'}</div></div>
     <button class="btn ghost" id="shLeave">Salir de la mesa</button>
     <p class="gfoot">Cada móvil cuenta lo suyo y el marcador se junta en el duelo de la mesa. Se usa el servicio público ntfy.sh: solo se envían nombres, colores y recuentos, y cualquiera con el código podría verlos.</p>` : `
-    <div class="sh-hero">${ui('people', '', 'width:56px;height:56px;color:var(--accent)')}<h4>Contad juntos, cada uno en su móvil</h4><p>Crea una mesa y comparte el código. Los marcadores se sincronizan en directo.</p></div>
+    <div class="sh-hero">${illu('mesa', 'hero-illu')}<h4>Contad juntos, cada uno en su móvil</h4><p>Ideal si sois varios: nadie tiene que pasarse el móvil.</p></div>
+    ${howBlock('mesa')}
     <button class="btn" id="shNew">${ui('plus')}Crear mesa nueva</button>
     <div class="gsec"><div class="glabel">Unirse con un código</div><div class="group"><label class="row"><input class="row-in code-in" id="shCode" maxlength="6" placeholder="ABC123" autocomplete="off" autocapitalize="characters" style="text-align:left"></label></div></div>
     <button class="btn plain" id="shJoin">Unirse</button>

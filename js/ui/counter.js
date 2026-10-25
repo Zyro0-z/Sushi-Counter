@@ -15,9 +15,10 @@ export const undoStack = [];
 /* ---------- Construcción de la cuadrícula ---------- */
 function cardHTML(t) {
   const mark = S.settings.allergenMode === 'mark' && hasAllergen(t);
-  return `<div class="pc zero${mark ? ' alg' : ''}" data-k="${t.id}" tabindex="0" role="button" aria-label="Sumar ${esc(t.name)}${mark ? '. Contiene alérgenos que has marcado' : ''}">
+  const plate = (CATS.find(c => c.id === t.cat) || CATS[0]).plate;
+  return `<div class="pc zero${mark ? ' alg' : ''}" data-k="${t.id}" style="--pc:${plate}" tabindex="0" role="button" aria-label="Sumar ${esc(t.name)}${mark ? '. Contiene alérgenos que has marcado' : ''}">
     <button class="pc-minus" aria-label="Quitar ${esc(t.name)}">${ui('minus')}</button>
-    <span class="pc-ic">${icon(t.id)}</span><span class="pc-n"></span>
+    <span class="pc-ic"><i class="plate" aria-hidden="true"></i>${icon(t.id)}</span><span class="pc-n"></span>
     <span class="pc-txt"><span class="pc-name">${esc(t.name)}</span><span class="pc-meta">${money(t.cost)} · ${t.kcal} kcal</span></span>
     ${t.fav ? `<svg viewBox="0 0 24 24" class="fav" aria-hidden="true">${UI.starf}</svg>` : ''}
     ${mark ? `<span class="algb" aria-hidden="true">${ui('warn')}</span>` : ''}
@@ -48,6 +49,7 @@ export function renderChips() {
 
 /* ---------- Actualización ---------- */
 export function updateCounter() {
+  app.renderPlay && app.renderPlay();
   const c = ctx(S.active), st = S.settings;
   const remote = app.remoteDiners ? app.remoteDiners() : [];
   const table = hero.mode === 'table' && (S.diners.length > 1 || remote.length > 0);

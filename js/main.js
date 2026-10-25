@@ -1,6 +1,6 @@
 // Arranque: une las pantallas, la navegación, los accesos rápidos y los procesos en segundo plano.
 import {S, save, saveNow} from './store.js';
-import {ui} from './icons.js';
+import {ui, ICON_DEFS} from './icons.js';
 import {money, sortTypes, tname} from './logic.js';
 import {$, $$, esc, app, icon, openSheet, closeSheet, isSheetOpen, popMenu, initSheet, applyLook, measureText} from './ui/common.js';
 import {feedback, hud, reduced} from './fx.js';
@@ -14,6 +14,7 @@ import {shareSheet, remoteSheet, remoteDiners, sharePush, connect, joinFromURL} 
 import {scanTicket} from './ui/scan.js';
 import {exportBackup, importBackup, exportCSV, shareCard, backupNudge} from './ui/files.js';
 import {showIntro} from './ui/intro.js';
+import {openHub, renderPlay, guideSheet, scanIntro} from './ui/hub.js';
 
 /* ---------- Pantalla encendida ---------- */
 let wake = null;
@@ -22,6 +23,24 @@ async function keepAwake() {
   try { wake = await navigator.wakeLock.request('screen'); wake.addEventListener('release', () => { wake = null; }); } catch (e) {}
 }
 function releaseAwake() { if (wake) { try { wake.release(); } catch (e) {} wake = null; } }
+
+/* ---------- Pantalla completa en la app instalada de iPhone ----------
+   En modo app, iOS a veces deja la ventana más corta que la pantalla y aparece una franja vacía abajo.
+   Se mide la diferencia y se estira la app hasta el borde. */
+function fitScreen() {
+  const r = document.documentElement, ios = /iP(hone|od|ad)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const standalone = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+  if (!ios || !standalone) return;
+  const portrait = innerHeight >= innerWidth, H = portrait ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
+  const gap = Math.round(H - innerHeight);
+  if (gap > 2 && gap < 220) {
+    r.dataset.fit = ''; r.style.setProperty('--app-h', H + 'px'); r.style.setProperty('--gapb', gap + 'px');
+    // Si iOS no informa del margen inferior, se reserva el de la barra de inicio
+    const probe = document.createElement('div'); probe.style.cssText = 'position:fixed;bottom:0;height:env(safe-area-inset-bottom,0px);visibility:hidden';
+    document.body.appendChild(probe); const sb = probe.offsetHeight; probe.remove();
+    if (sb < 1 && H >= 800 && portrait) r.style.setProperty('--sb', '34px'); else r.style.removeProperty('--sb');
+  } else { delete r.dataset.fit; r.style.removeProperty('--app-h'); r.style.removeProperty('--gapb'); r.style.removeProperty('--sb'); }
+}
 
 /* ---------- Coste real: explicación ---------- */
 function billInfo() {
@@ -71,20 +90,6 @@ function setPill(id) {
 function refreshAll() { renderChips(); updateCounter(); if (app.cur === 'ch') renderRetos(); if (app.cur === 'hist') renderHistory(); if (app.cur === 'set') renderSettings(); }
 function afterReset() { undoStack.length = 0; resetHeroCache(); buildGrid(); refreshAll(); connect(); }
 
-/* ---------- Menú ⋯ del contador ---------- */
-function moreMenu() {
-  popMenu($('#btnMore'), [
-    {l:'Registro', i:'list', sub:'Todo lo que has pedido, con hora', fn:logSheet},
-    {l:'Ruleta de sushi', i:'wheel', sub:'Que decida el azar', fn:roulette},
-    {l:'Contrarreloj', i:'timer', sub:S.session.trial ? 'En marcha' : 'Piezas contra el tiempo', fn:trialSetup},
-    {l:'Duelo en directo', i:'swords', sub:'Pantalla partida para dos', fn:duelSetup},
-    'sep',
-    {l:'Mesa compartida', i:'cloud', sub:S.share.code ? `Mesa ${S.share.code}` : 'Contad en varios móviles', fn:shareSheet},
-    {l:'Cambiar de buffet', i:'pin', fn:buffetPicker},
-    {l:'Escanear ticket', i:'camera', fn:scanTicket},
-  ], {align:'right'});
-}
-
 /* ---------- Reflejo de cristal que sigue al dedo ---------- */
 function initShine() {
   let lit = null, raf = 0, ev = null;
@@ -112,6 +117,7 @@ function shortcuts() {
   if (a === 'retos') go('ch');
   else if (a === 'historial' || a === 'hist') go('hist');
   else if (a === 'ruleta') setTimeout(roulette, 400);
+  else if (a === 'juegos') setTimeout(openHub, 400);
   else if (a === 'empezar' || a === 'start') setTimeout(buffetPicker, 400);
   if (p.get('a')) history.replaceState(null, '', location.pathname);
 }
@@ -122,15 +128,18 @@ Object.assign(app, {
   dinerSheet, typeSheet, billInfo, profileSheet, shareSheet, remoteSheet, remoteDiners, remoteCount:() => remoteDiners().length, sharePush,
   exportCSV, exportBackup, importBackup, shareCard, backupNudge, showIntro, scanTicket, duelSetup, trialRender, trialCheck,
   keepAwake, releaseAwake, resetHero:resetHeroCache, sessionStarted:keepAwake,
+  roulette, trialSetup, buffetPicker, logSheet, openHub, guideSheet, scanIntro, renderPlay,
 });
 
 /* ---------- Arranque ---------- */
 function boot() {
   document.body.dataset.tab = 'count';
+  fitScreen(); addEventListener('resize', fitScreen); addEventListener('orientationchange', () => setTimeout(fitScreen, 350)); addEventListener('pageshow', fitScreen);
   measureText(); applyLook(); initSheet();
   $$('.tb').forEach(b => { const [ic, l] = TABS[b.dataset.tab]; b.innerHTML = `${ui(ic)}<span>${l}</span>`; });
-  $('#btnUndo').innerHTML = ui('undo'); $('#btnMore').innerHTML = ui('more'); $('#btnNewCh').innerHTML = ui('plus');
-  $('#btnUndo').onclick = undo; $('#btnMore').onclick = moreMenu; $('#btnFinish').onclick = finishSheet; $('#btnNewCh').onclick = newChSheet;
+  document.querySelector('svg defs').insertAdjacentHTML('beforeend', ICON_DEFS);
+  $('#btnUndo').innerHTML = ui('undo'); $('#btnMore').innerHTML = ui('grid'); $('#btnNewCh').innerHTML = ui('plus');
+  $('#btnUndo').onclick = undo; $('#btnMore').onclick = () => { feedback('tick'); openHub(); }; $('#btnFinish').onclick = finishSheet; $('#btnNewCh').onclick = newChSheet;
   $('#setBack').onclick = settingsBack;
   $('#miniM').onclick = () => { setRetoSeg('mis'); go('ch'); };
   $('#buffetLine').onclick = buffetPicker;
@@ -153,7 +162,7 @@ function boot() {
   document.addEventListener('touchstart', () => {}, {passive:true});
 
   initHero(); initCards(); initChips(); initShine();
-  renderChips(); buildGrid();
+  renderChips(); buildGrid(); renderPlay();
   joinFromURL(); connect();
   shortcuts();
   showIntro();

@@ -49,6 +49,7 @@ export const DEFAULT_TYPES = [
   T('miso','Sopa miso','side',60,.15,3.5,'bol',[4,6,2.2],['soja','pescado']),
   T('edamame','Edamame','side',120,.28,4.5,'ración',[11,9,5],['soja']),
   T('wakame','Wakame','side',70,.30,5,'ración',[1.5,9,3.2],['sesamo','soja']),
+  T('onigiri','Onigiri','side',175,.30,2.5,'pieza',[4,36,1.5],['pescado','sesamo']),
   T('mochi','Mochi','dessert',95,.40,2.5,'pieza',[1.2,18,2.2],['lacteos']),
   T('helado','Helado','dessert',140,.25,3,'copa',[2.5,17,7],['lacteos','huevo']),
   T('fruta','Fruta','dessert',60,.20,3.5,'ración',[.6,14,.2],[]),

@@ -74,7 +74,8 @@ export function openSheet(o) {
   document.body.classList.add('sheet-open'); sheetOpen = o;
   $('[data-x]', sh).onclick = closeSheet;
   const ok = $('[data-ok]', sh); if (ok) ok.onclick = () => { if (o.onOk && o.onOk(sh) === false) return; closeSheet(); };
-  o.mount && o.mount(sh);
+  // Se monta sobre el cuerpo, que se crea de nuevo en cada hoja: así sus escuchas no se acumulan
+  o.mount && o.mount($('.sh-body', sh));
   setTimeout(() => { const f = $('[data-x]', sh); if (f && !sh.contains(document.activeElement)) f.focus({preventScroll:true}); }, 60);
   return sh;
 }
@@ -179,10 +180,9 @@ export function enableTilt(root) {
   } else start();
 }
 
-/* ---------- Avisos de logros en cola ---------- */
-const queue = []; let qBusy = false, bannerT;
-export function enqueue(item) { queue.push(item); if (!qBusy) runQueue(); }
-function runQueue() { const it = queue.shift(); if (!it) { qBusy = false; return; } qBusy = true; showBanner(it); setTimeout(runQueue, 2400); }
+/* ---------- Avisos de logros ----------
+   Lo que llega a la vez se junta en un único aviso compacto ("y 2 más").
+   Se cierra solo, deslizándolo hacia arriba o con Escape; tocarlo abre Retos. */
 export function mIcon(m) {
   if (m.type) return icon(m.type);
   if (m.k === 'cat') { const t = S.types.find(x => x.cat === m.cat && !x.deleted); if (t) return icon(t.id); }
@@ -190,17 +190,72 @@ export function mIcon(m) {
   const g = {norep:'stack', speed:'bolt', var:'compass', cost:'down', kcal:'dish'}[m.k] || 'star';
   return `<svg viewBox="0 0 24 24" class="mono" aria-hidden="true">${GLYPH[g].replace(/#fff/g, 'currentColor')}</svg>`;
 }
-function showBanner({kind, item, mission, who, fx, snd}) {
-  feedback(snd || (mission ? 'mission' : 'unlock'));
-  celebrate(fx || (mission ? 'rice' : tierFx(item.tier)));
-  const b = $('#banner'), d = diner(who);
-  const art = mission ? `<span class="mis-ic">${mIcon(mission)}</span>` : medal(item, false, 'shiny');
-  const title = mission ? mText(mission) : item.t, sub = mission ? `+${mission.xp} XP` : descOf(item);
-  b.innerHTML = `<button class="bn glass">${art}<span class="bn-t"><small>${kind}${S.diners.length > 1 && who ? ' · ' + esc(d.name) : ''}</small><b>${esc(title)}</b><span>${esc(sub || '')}</span></span></button>`;
-  b.firstChild.onclick = () => { b.classList.remove('show'); app.go && app.go('ch'); };
+const RANK = {plat:5, gold:4, accent:3, silver:2, bronze:1};
+const prio = it => (it.fx === 'fireworks' ? 10 : 0) + (it.mission ? 0 : (RANK[it.item.tier] || 1));
+const important = it => it.fx === 'fireworks' || it.imp || (!it.mission && (it.item.tier === 'gold' || it.item.tier === 'plat')) || /récord|calorías|título|Contrarreloj/i.test(it.kind);
+const titleOf = it => it.mission ? mText(it.mission) : it.item.t;
+let pending = [], flushT = 0, shown = null, hideT = 0, hideAt = 0, held = false;
+export function enqueue(item) {
+  announce(`${item.kind}: ${titleOf(item)}`);
+  const mode = S.settings.notify || 'all';
+  if (mode === 'off' || (mode === 'important' && !important(item))) return;
+  pending.push(item); clearTimeout(flushT); flushT = setTimeout(flush, 80);
+}
+function flush() {
+  const batch = pending; pending = []; if (!batch.length) return;
+  const lead = batch.reduce((a, b) => prio(b) > prio(a) ? b : a);
+  // Solo hay fiesta si lo nuevo supera a lo que ya se ve; si no, se suma al aviso sin más ruido
+  const better = !shown || prio(lead) > prio(shown.lead);
+  if (better) { feedback(lead.snd || (lead.mission ? 'mission' : 'unlock')); celebrate(lead.fx || (lead.mission ? 'rice' : tierFx(lead.item.tier))); }
+  else feedback('tick');
+  if (shown) { shown.items.push(...batch); if (better) shown.lead = lead; }
+  else shown = {items:batch, lead};
+  drawBanner(!!shown.el);
+  armHide(shown.items.length > 1 ? 4200 : 3000);
+}
+function armHide(ms) { clearTimeout(hideT); hideAt = Date.now() + ms; if (!held) hideT = setTimeout(() => dismissBanner(), ms); }
+function drawBanner(update) {
+  const b = $('#banner'), {items, lead} = shown, extra = items.filter(x => x !== lead), d = diner(lead.who);
+  const art = it => it.mission ? `<span class="mis-ic">${mIcon(it.mission)}</span>` : medal(it.item, false, 'shiny');
+  const who = S.diners.length > 1 && lead.who ? ' · ' + esc(d.name) : '';
+  const more = extra.length ? `<span class="bn-more" aria-hidden="true">${extra.slice(-3).map(x => `<i>${art(x)}</i>`).join('')}<b>+${extra.length}</b></span>` : '';
+  const sub = lead.mission ? `+${lead.mission.xp} XP` : (descOf(lead.item) || '');
+  const label = `${lead.kind}: ${titleOf(lead)}${extra.length ? ` y ${extra.length} más` : ''}. Toca para verlo en Retos o desliza hacia arriba para cerrar.`;
+  b.innerHTML = `<div class="bn glass" role="button" tabindex="0" aria-label="${esc(label)}">${art(lead)}<span class="bn-t"><small>${esc(lead.kind)}${who}</small><b>${esc(titleOf(lead))}</b>${extra.length ? `<span>y ${extra.length} ${extra.length === 1 ? 'cosa más' : 'cosas más'} · toca para ver</span>` : sub ? `<span>${esc(sub)}</span>` : ''}</span>${more}<span class="bn-grab" aria-hidden="true"></span></div>`;
+  shown.el = b.firstChild;
+  if (update) { shown.el.animate([{transform:'scale(1.04)'}, {transform:'none'}], {duration:380, easing:'cubic-bezier(.3,1.5,.5,1)'}); return; }
+  bindBanner(b);
+  b.style.transform = ''; b.classList.remove('gone');
   requestAnimationFrame(() => b.classList.add('show'));
-  announce(`${kind}: ${title}`);
-  clearTimeout(bannerT); bannerT = setTimeout(() => b.classList.remove('show'), 2200);
+}
+let bound = false;
+function bindBanner(b) {
+  if (bound) return; bound = true;
+  let y0 = 0, dy = 0, t0 = 0, id = null, moved = false;
+  b.addEventListener('pointerdown', e => {
+    if (!shown) return; id = e.pointerId; y0 = e.clientY; dy = 0; t0 = Date.now(); moved = false; held = true; clearTimeout(hideT);
+    b.classList.add('drag'); try { b.setPointerCapture(id); } catch (err) {}
+  });
+  b.addEventListener('pointermove', e => {
+    if (e.pointerId !== id) return; dy = e.clientY - y0; if (Math.abs(dy) > 6) moved = true;
+    b.style.transform = `translateY(${dy < 0 ? dy : dy * .25}px)`;
+  });
+  const end = e => {
+    if (e.pointerId !== id) return; id = null; held = false; b.classList.remove('drag');
+    const v = dy / Math.max(1, Date.now() - t0);
+    if (dy < -28 || v < -.35) { dismissBanner(true); return; }
+    b.style.transform = '';
+    if (!moved && e.type === 'pointerup') { dismissBanner(); app.go && app.go('ch'); return; }
+    armHide(Math.max(1600, hideAt - Date.now()));
+  };
+  b.addEventListener('pointerup', end); b.addEventListener('pointercancel', end);
+  b.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); dismissBanner(); app.go && app.go('ch'); } if (e.key === 'Escape') dismissBanner(true); });
+  addEventListener('keydown', e => { if (e.key === 'Escape' && shown) dismissBanner(true); });
+}
+export function dismissBanner(swiped) {
+  const b = $('#banner'); clearTimeout(hideT); shown = null; held = false;
+  if (swiped) feedback('tick');
+  b.style.transform = ''; b.classList.remove('show');
 }
 
 /* ---------- Archivos: compartir o descargar ---------- */

@@ -1,12 +1,13 @@
 // Juegos: ruleta de sushi, duelo en directo a pantalla partida y contrarreloj.
 import {S, save} from '../store.js';
 import {CATS} from '../catalog.js';
-import {ui, lighten} from '../icons.js';
+import {ui, illu, lighten} from '../icons.js';
 import {diner, initial, tname, visibleTypes, lifetime, ctx, clock, typeById} from '../logic.js';
 import {$, $$, esc, app, icon, iconRaw, openSheet, closeSheet, seg, bindSeg, stepper, bindStepper, enqueue} from './common.js';
 import {feedback, hud, celebrate, sound, reduced, announce} from '../fx.js';
 import {addN, removeEntries} from './counter.js';
 import {say} from './hero.js';
+import {howBlock} from './hub.js';
 
 /* ---------- Ruleta ---------- */
 function wheelChoices() {
@@ -34,8 +35,9 @@ export function roulette() {
   </svg>`;
   S.stats.roulette++; save();
   openSheet({title:'Ruleta de sushi', cancel:'Cerrar', body:`
+    ${howBlock('ruleta')}
     <div class="wheel-wrap"><div class="wh-ptr" aria-hidden="true"></div>${wheel}<button class="wh-btn" id="spin">Girar</button></div>
-    <div class="wh-res" id="whRes" aria-live="polite"><p class="gfoot" style="text-align:center;margin:0">Prioriza lo que nunca has probado y lo que aún no has pedido hoy.</p></div>`,
+    <div class="wh-res" id="whRes" aria-live="polite"></div>`,
     mount(el) {
       let rot = 0, spinning = false;
       const wh = $('#wheel', el);
@@ -75,14 +77,15 @@ function quickFor(id) {
 }
 export function duelSetup() {
   if (S.diners.length < 2) {
-    openSheet({title:'Duelo', cancel:'Cerrar', body:`<div class="sh-hero">${ui('swords', '', 'width:64px;height:64px;color:var(--accent)')}<h4>Hacen falta dos</h4><p>Añade a otra persona de la mesa para jugar un duelo en este móvil.</p></div><button class="btn" id="dAdd">${ui('plus')}Añadir comensal</button>`,
+    openSheet({title:'Duelo', cancel:'Cerrar', body:`<div class="sh-hero">${illu('duelo', 'hero-illu')}<h4>Hacen falta dos</h4><p>Añade a otra persona de la mesa para jugar un duelo en este móvil.</p></div>${howBlock('duelo')}<button class="btn" id="dAdd">${ui('plus')}Añadir comensal</button>`,
       mount(el) { $('#dAdd', el).onclick = () => app.dinerSheet(); }});
     return;
   }
   let a = S.diners[0].id, b = S.diners[1].id, mins = 5;
   const pick = (name, sel) => `<div class="picks" data-pick="${name}">${S.diners.map(d => `<button class="pick dp${d.id === sel ? ' on' : ''}" data-id="${d.id}"><span class="av md" style="--c:${d.color}">${esc(initial(d.name))}</span>${esc(d.name)}</button>`).join('')}</div>`;
   openSheet({title:'Duelo en directo', ok:'Empezar', body:`
-    <div class="sh-hero">${ui('swords', '', 'width:60px;height:60px;color:var(--accent)')}<p>Pantalla partida: dejad el móvil en medio de la mesa. Cada uno suma desde su lado y gana quien más coma antes de que acabe el tiempo.</p></div>
+    <div class="sh-hero">${illu('duelo', 'hero-illu')}<p>Pantalla partida: dejad el móvil en medio de la mesa y gana quien más coma antes de que acabe el tiempo.</p></div>
+    ${howBlock('duelo')}
     <div class="gsec"><div class="glabel">Lado de abajo</div>${pick('a', a)}</div>
     <div class="gsec"><div class="glabel">Lado de arriba</div>${pick('b', b)}</div>
     <div class="gsec"><div class="glabel">Duración</div><div class="group"><div class="row">${seg('dmins', [['3', '3 min'], ['5', '5 min'], ['10', '10 min'], ['15', '15 min']], '5')}</div></div></div>`,
@@ -162,7 +165,8 @@ export function trialSetup() {
   if (S.session.trial) { hud('Ya hay una contrarreloj en marcha'); return; }
   let n = 15, mins = 10;
   openSheet({title:'Contrarreloj', ok:'Empezar', body:`
-    <div class="sh-hero">${ui('timer', '', 'width:60px;height:60px;color:var(--accent)')}<p>Elige un reto. El reloj empieza en cuanto lo aceptes y cuenta las piezas de ${esc(diner(S.active).name)}.</p></div>
+    <div class="sh-hero">${illu('reloj', 'hero-illu')}<p>El reloj empieza en cuanto toques Empezar y cuenta las piezas de ${esc(diner(S.active).name)}.</p></div>
+    ${howBlock('reloj')}
     <div class="group" id="trPre">${PRESETS.map(([pn, pm], i) => `<button class="row${i === 1 ? ' sel' : ''}" data-n="${pn}" data-m="${pm}"><span class="row-l"><b class="num">${pn}</b> piezas en <b class="num">${pm}</b> minutos</span>${i === 1 ? ui('check', 'chk') : ''}</button>`).join('')}</div>
     <div class="gsec"><div class="glabel">A tu medida</div><div class="group">
       <div class="row"><span class="row-l">Piezas</span><span class="row-v num" id="trN">${n}</span>${stepper('tr-n')}</div>

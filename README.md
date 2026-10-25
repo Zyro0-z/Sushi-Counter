@@ -17,7 +17,7 @@ Web app con aspecto de iOS para llevar la cuenta de lo que comes en un buffet de
 ## Qué hace
 
 **Contar**
-- 30 piezas con iconos propios en 5 categorías, y piezas personalizadas con plantilla y color.
+- 31 piezas ilustradas con luz, sombra y textura (granos de arroz, sésamo, huevas…), sobre un plato del color de su categoría, como en los kaiten. También piezas personalizadas con plantilla y color.
 - Toca para sumar, desliza a la derecha para sumar varias, a la izquierda para quitar y mantén pulsado para el menú.
 - Deshacer en un toque y registro con hora, en el que deslizas para borrar.
 - Cinta kaiten animada, torre de platos con los colores de cada categoría y gráfica de ritmo.
@@ -30,7 +30,9 @@ Web app con aspecto de iOS para llevar la cuenta de lo que comes en un buffet de
 
 **Jugar**
 - 3 misiones aleatorias por sesión, 37 desafíos, 35 logros, 15 títulos y niveles con XP.
-- Duelo en directo a pantalla partida, ruleta de sushi y contrarreloj.
+- Duelo en directo a pantalla partida, ruleta de sushi y contrarreloj, a mano en «Para jugar en la mesa» y en el panel de juegos y herramientas.
+- Cada juego explica cómo funciona en tres pasos, y hay una guía de uso para quien empieza.
+- Avisos de logros compactos: si llegan varios a la vez se juntan en uno y se quitan deslizando hacia arriba. Se pueden dejar en todos, solo los importantes o ninguno.
 - Mesa compartida: cada uno cuenta en su móvil y el marcador se junta en directo.
 - Rachas semanales, calendario, ranking histórico de la mesa y celebraciones distintas según el logro.
 
@@ -51,6 +53,7 @@ El coste de cada pieza es una estimación de ingredientes con precios de mayoris
 - El escáner de tickets descarga [Tesseract.js](https://tesseract.projectnaptha.com/) (unos 5 MB) la primera vez.
 - Safari en iPhone no permite que las webs vibren ni muestra los accesos rápidos del icono; en Android sí funcionan.
 - Los datos viven en el dispositivo. Usa la copia de seguridad para no perderlos.
+- En la app instalada en iPhone, iOS a veces deja la ventana más corta que la pantalla; la app lo detecta y se estira hasta el borde.
 
 ## Desarrollo
 
@@ -68,7 +71,8 @@ npm test       # pruebas de la lógica con node --test
 | `js/catalog.js` | Piezas, costes, alérgenos, nutrición y temas |
 | `js/store.js` | Estado guardado y migraciones |
 | `js/logic.js` | Cálculos, retos, logros, misiones y estadísticas |
-| `js/icons.js` | Iconos, medallas y mascota |
+| `js/art.js` | Ilustraciones de comida, de los juegos y mascota |
+| `js/icons.js` | Iconos de interfaz, alérgenos y medallas |
 | `js/fx.js` | Sonidos, vibración y partículas |
 | `js/ui/*.js` | Pantallas y hojas |
 | `sw.js` | Modo sin conexión |

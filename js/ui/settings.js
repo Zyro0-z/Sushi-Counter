@@ -7,7 +7,7 @@ import {$, $$, esc, app, icon, openSheet, closeSheet, twoStep, stepper, bindStep
 import {feedback, hud, sound} from '../fx.js';
 
 const stack = ['root'];
-const TITLES = {root:'Ajustes', buffets:'Buffets y precios', types:'Piezas', alg:'Alérgenos y nutrición', diners:'Comensales', look:'Tema y colores', a11y:'Accesibilidad', sound:'Sonido y vibración', data:'Datos y copia'};
+const TITLES = {root:'Ajustes', buffets:'Buffets y precios', types:'Piezas', alg:'Alérgenos y nutrición', diners:'Comensales', look:'Tema y colores', a11y:'Accesibilidad', sound:'Sonido y avisos', data:'Datos y copia'};
 const navRow = (page, ic, label, sub = '', color = 'var(--accent)') => `<button class="row nav-row" data-page="${page}" style="--ins:58px"><span class="ri" style="--rc:${color}">${ui(ic)}</span><span class="row-l">${label}</span>${sub ? `<span class="row-v">${sub}</span>` : ''}${ui('chev', 'chev')}</button>`;
 const actRow = (id, ic, label, color = 'var(--accent)', cls = '') => `<button class="row nav-row ${cls}" id="${id}" style="--ins:58px"><span class="ri" style="--rc:${color}">${ui(ic)}</span><span class="row-l">${label}</span></button>`;
 
@@ -39,11 +39,13 @@ export function renderSettings(dir) {
     <div class="gsec"><div class="glabel">Apariencia</div><div class="group">
       ${navRow('look', 'paint', 'Tema y colores', SKINS.find(k => k.id === st.skin).name, '#AF52DE')}
       ${navRow('a11y', 'access', 'Accesibilidad', '', '#0A84FF')}
-      ${navRow('sound', 'speaker', 'Sonido y vibración', {theme:'Temáticos', simple:'Simples', off:'Sin sonido'}[st.sound], '#FF3B30')}
+      ${navRow('sound', 'speaker', 'Sonido y avisos', {theme:'Temáticos', simple:'Simples', off:'Sin sonido'}[st.sound], '#FF3B30')}
     </div></div>
     <div class="gsec"><div class="glabel">Datos</div><div class="group">
       ${navRow('data', 'cloud', 'Copia de seguridad e iCloud', st.lastBackup ? 'Hecha' : 'Sin copia', '#8E8E93')}
       ${actRow('csvRow', 'table', 'Exportar a Excel (CSV)', '#34C759')}
+      ${actRow('guideRow', 'help', 'Guía de uso', '#0A84FF')}
+      ${actRow('hubRow', 'grid', 'Juegos y herramientas', '#FF9500')}
       ${actRow('introRow', 'book', 'Ver la bienvenida otra vez', '#FF9500')}
     </div><p class="gfoot">Contador de Sushi · los datos se guardan solo en este dispositivo.</p></div>`;
   }
@@ -101,7 +103,9 @@ export function renderSettings(dir) {
     </div><p class="gfoot">Compatible con VoiceOver: cada pieza anuncia su nombre y su cuenta, y los logros se leen en voz alta. También puedes usarla con teclado: Intro suma, Retroceso quita y la tecla de menú abre las opciones.</p></div>`;
   }
   if (page === 'sound') {
-    h += `<div class="gsec"><div class="glabel">Sonidos</div><div class="group"><div class="row">${seg('sound', [['theme', 'Temáticos'], ['simple', 'Simples'], ['off', 'Sin sonido']], st.sound)}</div>
+    h += `<div class="gsec"><div class="glabel">Avisos de logros</div><div class="group"><div class="row">${seg('notify', [['all', 'Todos'], ['important', 'Importantes'], ['off', 'Ninguno']], st.notify)}</div></div>
+      <p class="gfoot">${{all:'Verás un aviso por cada misión, desafío o logro. Si llegan varios a la vez se juntan en uno.', important:'Solo avisan las subidas de nivel, los logros de oro y platino, los récords y el límite de calorías. El resto se guarda en Retos.', off:'No sale ningún aviso. Lo que consigas aparece con un número en la pestaña Retos.'}[st.notify]} Para quitar un aviso, deslízalo hacia arriba.</p></div>
+    <div class="gsec"><div class="glabel">Sonidos</div><div class="group"><div class="row">${seg('sound', [['theme', 'Temáticos'], ['simple', 'Simples'], ['off', 'Sin sonido']], st.sound)}</div>
       <div class="row prev-row">${[['add', 'Palillos'], ['mission', 'Campanita'], ['level', 'Gong'], ['taiko', 'Taiko']].map(([k, l]) => `<button class="pill" data-snd="${k}">${ui('play')}${l}</button>`).join('')}</div></div></div>
     <div class="gsec"><div class="group">
       <div class="row"><span class="row-l">Vibración</span>${sw('inHap', st.haptics, 'Vibración')}</div>
@@ -137,6 +141,8 @@ function wire(page, root) {
   on('shareRow', () => app.shareSheet());
   on('csvRow', () => app.exportCSV()); on('csvRow2', () => app.exportCSV());
   on('introRow', () => app.showIntro(true));
+  on('guideRow', () => app.guideSheet());
+  on('hubRow', () => app.openHub());
   bindStepper(root, 'goal', dir => { st.goal = Math.max(5, Math.min(400, st.goal + dir * 5)); $('#goalV').textContent = st.goal; save(); app.updateCounter(); });
   bindStepper(root, 'kcal', dir => { st.kcalLimit = Math.max(500, Math.min(6000, st.kcalLimit + dir * 100)); $('#kcalV').textContent = nf0(st.kcalLimit) + ' kcal'; save(); app.updateCounter(); });
   bindSeg(root, 'cur', v => { st.cur = v; save(); app.buildGrid(); setTimeout(() => renderSettings(), 300); });
@@ -145,6 +151,7 @@ function wire(page, root) {
   bindSeg(root, 'layout', v => { st.layout = v; save(); app.buildGrid(); });
   bindSeg(root, 'textSize', v => { st.textSize = v === 'auto' ? 'auto' : +v; save(); applyLook(); });
   bindSeg(root, 'sound', v => { st.sound = v; save(); sound('add'); });
+  bindSeg(root, 'notify', v => { st.notify = v; save(); setTimeout(() => renderSettings(), 250); });
   root.addEventListener('change', e => {
     const t = e.target;
     if (t.dataset.ton) { typeById(t.dataset.ton).on = t.checked; save(); app.buildGrid(); feedback('tick'); }
@@ -170,7 +177,7 @@ function wire(page, root) {
   });
   root.addEventListener('keydown', e => { const r = e.target.closest('[data-type],[data-buf]'); if (r && e.target === r && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); r.click(); } });
   on('addBuf', () => buffetSheet());
-  on('scanRow', () => app.scanTicket());
+  on('scanRow', () => app.scanIntro());
   on('newType', () => customTypeSheet());
   on('resetCosts', () => { S.types.forEach(t => { const d = DEFAULT_TYPES.find(x => x.id === t.id); if (d) { t.cost = d.cost; t.carta = d.carta; } }); save(); app.buildGrid(); renderSettings(); hud('Costes restaurados'); });
   on('expData', () => app.exportBackup());

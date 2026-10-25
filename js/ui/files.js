@@ -1,6 +1,6 @@
 // Archivos: copia de seguridad (iCloud Drive a través de Compartir), CSV e imagen para compartir.
 import {S, save, saveNow, migrate, setState} from '../store.js';
-import {iconInner, darken} from '../icons.js';
+import {iconInner, darken, ICON_DEFS} from '../icons.js';
 import {sum, money, durShort, costOf, buildCSV, ymd, typeById, level, activeTitle} from '../logic.js';
 import {$, app, icon, openSheet, closeSheet, saveFile, applyLook} from './common.js';
 import {hud, feedback} from '../fx.js';
@@ -35,7 +35,7 @@ export function backupNudge() {
 
 /* ---------- Imagen del resumen para compartir ---------- */
 const loadImg = src => new Promise(res => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = src; });
-const iconURL = k => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="240" height="240">${iconInner(k, typeById(k)).replace(/class="shd"/g, 'fill="rgba(30,20,10,.16)"').replace(/class="rim"/g, 'stroke="rgba(0,0,0,.08)" stroke-width="1"').replace(/class="(steam|sizzle|sway|bonito)"/g, '')}</svg>`);
+const iconURL = k => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="240" height="240"><defs>${ICON_DEFS}</defs>${iconInner(k, typeById(k)).replace(/class="shd"/g, 'fill="rgba(30,20,10,.16)"').replace(/class="rim"/g, 'stroke="rgba(0,0,0,.08)" stroke-width="1"').replace(/class="(steam|sizzle|sway|bonito)"/g, '')}</svg>`);
 const accent = () => getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#FA5D3C';
 export async function shareCard(rec) {
   hud('Preparando imagen');
