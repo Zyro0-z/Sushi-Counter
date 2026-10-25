@@ -79,9 +79,9 @@ let playKey = '';
 export function renderPlay() {
   const box = $('#play'); if (!box) return;
   const tr = S.session.trial, code = S.share.code, b = currentBuffet(), hasMenu = !!app.menuCount && app.menuCount(b.id) > 0;
-  const key = `${!!tr}|${code}|${b.id}|${hasMenu}|${S.settings.menuHint}`;
+  const key = `${!!tr}|${code}|${b.id}|${hasMenu}|${S.settings.menuHint}|${S.session.log.length > 0}`;
   if (key === playKey && box.firstChild) return; playKey = key;
-  renderMenuHint(!hasMenu && S.settings.menuHint !== false);
+  app.renderHint && app.renderHint();
   const items = [
     ['ruleta', 'Ruleta', 'Qué pido', () => app.roulette()],
     ['duelo', 'Duelo', 'Uno contra uno', () => app.duelSetup()],
@@ -95,15 +95,6 @@ export function renderPlay() {
     const b = e.target.closest('[data-play]'); if (!b) return;
     feedback('tick'); items.find(x => x[0] === b.dataset.play)[3]();
   };
-}
-
-/* ---------- Aviso para añadir la carta del restaurante ---------- */
-function renderMenuHint(show) {
-  const h = $('#menuHint'); if (!h) return;
-  h.hidden = !show; if (!show) return;
-  h.innerHTML = `<span class="mh-ill">${illu('carta')}</span><span class="mh-tx"><b>Cuenta con la carta del restaurante</b><span>Búscalo y añadimos sus platos: nigiri flambeado, maki frito…</span></span>
-    <span class="mh-go">${ui('search')}Buscar</span><button class="mh-x" id="mhX" aria-label="No volver a mostrar">${ui('x')}</button>`;
-  h.onclick = e => { if (e.target.closest('#mhX')) { S.settings.menuHint = false; save(); h.hidden = true; feedback('tick'); return; } feedback('tick'); app.openFinder(); };
 }
 
 /* ---------- Guía de uso ---------- */

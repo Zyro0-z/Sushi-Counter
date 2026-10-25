@@ -1,21 +1,21 @@
 // Arranque: une las pantallas, la navegación, los accesos rápidos y los procesos en segundo plano.
 import {S, save, saveNow} from './store.js';
 import {ui, ICON_DEFS} from './icons.js';
-import {money, sortTypes, tname} from './logic.js';
+import {money, sortTypes, tname, currentBuffet} from './logic.js';
 import {$, $$, esc, app, icon, openSheet, closeSheet, isSheetOpen, popMenu, initSheet, applyLook, measureText} from './ui/common.js';
 import {feedback, hud, reduced} from './fx.js';
 import {initHero, updateTime, mascotTick, resetHeroCache} from './ui/hero.js';
 import {buildGrid, renderChips, updateCounter, renderMini, checkAll, undo, logSheet, initCards, initChips, undoStack} from './ui/counter.js';
 import {renderRetos, updateBadge, chSheet, achSheet, newChSheet, profileSheet, setRetoSeg} from './ui/retos.js';
-import {renderHistory, histSheet, finishSheet} from './ui/history.js';
+import {renderHistory, histSheet, finishSheet, staleCheck} from './ui/history.js';
 import {renderSettings, settingsBack, settingsRoot, dinerSheet, typeSheet, buffetPicker, initSwipeBack} from './ui/settings.js';
 import {roulette, duelSetup, trialSetup, trialRender, trialCheck} from './ui/play.js';
-import {shareSheet, remoteSheet, remoteDiners, sharePush, connect, joinFromURL} from './ui/share.js';
+import {shareSheet, remoteSheet, remoteDiners, sharePush, connect, joinFromURL, shareMenu} from './ui/share.js';
 import {scanTicket} from './ui/scan.js';
 import {exportBackup, importBackup, exportCSV, shareCard, backupNudge} from './ui/files.js';
 import {showIntro} from './ui/intro.js';
 import {openHub, renderPlay, guideSheet, scanIntro} from './ui/hub.js';
-import {openFinder, menuSheet, menuCount} from './ui/carta.js';
+import {openFinder, menuSheet, menuCount, renderHint, detectPlace, offerMenu, rateSheet, rateListSheet, readerSheet} from './ui/carta.js';
 
 /* ---------- Pantalla encendida ---------- */
 let wake = null;
@@ -117,6 +117,7 @@ Object.assign(app, {
   exportCSV, exportBackup, importBackup, shareCard, backupNudge, showIntro, scanTicket, duelSetup, trialRender, trialCheck,
   keepAwake, releaseAwake, resetHero:resetHeroCache, sessionStarted:keepAwake,
   roulette, trialSetup, buffetPicker, logSheet, openHub, guideSheet, scanIntro, renderPlay, openFinder, menuSheet, menuCount,
+  renderHint, detectPlace, offerMenu, shareMenu, rateSheet, rateListSheet, readerSheet,
 });
 
 /* ---------- Arranque ---------- */
@@ -129,7 +130,8 @@ function boot() {
   $('#btnUndo').onclick = undo; $('#btnMore').onclick = () => { feedback('tick'); openHub(); }; $('#btnFinish').onclick = finishSheet; $('#btnNewCh').onclick = newChSheet;
   $('#setBack').onclick = settingsBack;
   $('#miniM').onclick = () => { setRetoSeg('mis'); go('ch'); };
-  $('#buffetLine').onclick = buffetPicker;
+  // La etiqueta «Carta» abre la carta; el resto de la línea, el selector de buffet
+  $('#buffetLine').onclick = e => { feedback('tick'); if (e.target.closest('.bl-carta')) menuSheet(currentBuffet().id); else buffetPicker(); };
   $('#chBody').addEventListener('click', e => { const r = e.target.closest('[data-ch]'); if (r) return chSheet(r.dataset.ch); const a = e.target.closest('[data-ach]'); if (a) achSheet(a.dataset.ach); });
   $('#histBody').addEventListener('click', e => { const r = e.target.closest('[data-h]'); if (r) histSheet(r.dataset.h); });
   $('.tabbar').addEventListener('click', e => { if (document.body.classList.contains('tb-min')) { setMin(false); feedback('tick'); return; } const b = e.target.closest('.tb'); if (b) { go(b.dataset.tab); feedback('tick'); } });
@@ -143,7 +145,7 @@ function boot() {
     v.scrollTo({top:s.getBoundingClientRect().top - v.getBoundingClientRect().top + v.scrollTop - pillOffset() - 4, behavior:reduced() ? 'auto' : 'smooth'});
   });
   addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z' && !(e.target.closest && e.target.closest('input'))) { e.preventDefault(); undo(); } });
-  addEventListener('visibilitychange', () => { if (document.hidden) saveNow(); else keepAwake(); });
+  addEventListener('visibilitychange', () => { if (document.hidden) saveNow(); else { keepAwake(); staleCheck(); detectPlace(); } });
   addEventListener('pagehide', saveNow);
   matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', applyLook);
   document.addEventListener('touchstart', () => {}, {passive:true});
@@ -154,6 +156,7 @@ function boot() {
   shortcuts();
   showIntro();
   keepAwake();
+  setTimeout(() => { if (S.settings.introSeen) { staleCheck(); detectPlace(); } }, 1500);
 
   let tick = 0;
   setInterval(() => {

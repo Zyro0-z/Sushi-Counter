@@ -111,3 +111,41 @@ test('ajusta calorías, coste y alérgenos según los detalles', () => {
   const t = menuType({...it, name:'Maki frito de pollo con queso', sec:'Makis', price:null, pieces:null, desc:''}, 'b2', 3);
   assert.ok(t.kcal > 35 + 50); assert.ok(t.al.includes('lacteos') && t.al.includes('gluten')); assert.ok(!t.al.includes('pescado'));
 });
+
+import {findMenuImages, directUrl, pickSite, linksFromSearch, guessPaths} from '../js/menu.js';
+
+test('encuentra la carta aunque el enlace sea una imagen, un PDF suelto o Google Drive', () => {
+  const md = `[![Ver carta](https://sakura.example/img/boton-carta.png)](https://sakura.example/wp-content/uploads/2025/03/carta-buffet.pdf)
+Descarga: https://sakura.example/docs/postres.pdf
+[Nuestra carta](https://drive.google.com/file/d/1AbCdEfGhIjKlMnOpQrStUvWxYz123456/view?usp=sharing)
+[Reservar mesa](https://sakura.example/reservas) [Instagram](https://instagram.com/sakura)
+![Carta mediodía](https://sakura.example/img/carta-mediodia.jpg) ![logo](https://sakura.example/logo.png)`;
+  const links = findMenuLinks(md, 'https://sakura.example/');
+  assert.ok(links.includes('https://sakura.example/wp-content/uploads/2025/03/carta-buffet.pdf'));
+  assert.ok(links.includes('https://sakura.example/docs/postres.pdf'));
+  assert.ok(links.includes('https://drive.google.com/uc?export=download&id=1AbCdEfGhIjKlMnOpQrStUvWxYz123456'));
+  assert.ok(!links.some(l => /reservas|instagram/.test(l)));
+  assert.deepEqual(findMenuImages(md, 'https://sakura.example/'), ['https://sakura.example/img/carta-mediodia.jpg']);
+  assert.equal(directUrl('https://www.dropbox.com/s/abc/carta.pdf?dl=0'), 'https://www.dropbox.com/s/abc/carta.pdf?dl=1');
+  assert.equal(guessPaths('https://sakura.example/es/inicio')[0], 'https://sakura.example/carta');
+});
+
+test('elige la web oficial entre resultados de búsqueda y descarta portales', () => {
+  const md = `[Sakura Buffet - Palencia - Tripadvisor](https://duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.tripadvisor.es%2FRestaurant_Review-Sakura.html)
+[Carta | Sakura Buffet Japonés Palencia](https://duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.sakurabuffet.es%2Fcarta%2F)
+[Sakura Buffet en Facebook](https://www.facebook.com/sakurabuffet)
+[Carta de Sakura Buffet](https://carta.menu/restaurants/palencia/sakura-buffet/menu)`;
+  const res = linksFromSearch(md);
+  assert.equal(res.length, 4);
+  const {site, menus} = pickSite(res, {name:'Sakura Buffet', city:'Palencia'});
+  assert.equal(site, 'https://www.sakurabuffet.es/');
+  assert.ok(menus.includes('https://www.sakurabuffet.es/carta/'));
+  assert.ok(menus.includes('https://carta.menu/restaurants/palencia/sakura-buffet/menu'));
+  assert.equal(pickSite([{url:'https://www.ayuntamientodepalencia.es/', title:'Ayuntamiento de Palencia', snippet:''}], {name:'Sakura Buffet', city:'Palencia'}).site, null);
+});
+
+import {buffetPrices} from '../js/menu.js';
+test('lee varios precios del buffet en la misma línea', () => {
+  assert.deepEqual(buffetPrices('Precio buffet: mediodía 14,90 € · noche y fin de semana 17,90 €'), {noon:14.9, night:17.9, weekend:17.9});
+  assert.deepEqual(buffetPrices('BUFFET LIBRE\nAdultos 16,50 €\nNiños menores de 120 cm 9,95 €'), {noon:16.5, night:16.5, weekend:16.5});
+});

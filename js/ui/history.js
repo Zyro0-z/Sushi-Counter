@@ -1,10 +1,10 @@
 // Historial: sesiones, estadísticas avanzadas, mapa de calor, resumen al terminar y guardado.
 import {S, save, freshSession} from '../store.js';
 import {CATS} from '../catalog.js';
-import {medal, ui} from '../icons.js';
+import {medal, ui, illu} from '../icons.js';
 import {me, initial, sum, money, durShort, nf0, tname, costOf, cartaOf, kcalOf, macrosOf, counts, chById, heatmap, favorites,
-  compareLast, paceSeries, priceNow, currentBuffet, sessionSlot, activeTitle} from '../logic.js';
-import {$, $$, esc, app, icon, openSheet, closeSheet, twoStep, Odo, seg, bindSeg} from './common.js';
+  compareLast, paceSeries, priceNow, currentBuffet, sessionSlot, activeTitle, hhmm, typeById} from '../logic.js';
+import {$, $$, esc, app, icon, openSheet, closeSheet, twoStep, Odo, seg, bindSeg, isSheetOpen} from './common.js';
 import {feedback, hud, celebrate} from '../fx.js';
 import {undoStack} from './counter.js';
 
@@ -116,9 +116,11 @@ export function buildRecord(ms) {
     diners:people.map(x => ({me:x.d.id === me().id, name:x.d.name, color:x.d.color, counts:counts(x.d.id), medals:[...x.m],
       log:S.session.log.filter(e => e.d === x.d.id).map(e => [Math.round((e.t - t0) / 1000), e.k])}))}};
 }
-export function finishSheet() {
+// endAt: para cerrar una sesión olvidada con la hora de su última pieza
+export function finishSheet(endAt = null) {
   if (!S.session.log.length) return;
-  const ms = Date.now() - S.session.start, tot = S.session.log.length, all = counts();
+  const end = () => endAt || Date.now();
+  const ms = end() - S.session.start, tot = S.session.log.length, all = counts();
   const top = Object.entries(all).sort((a, b) => b[1] - a[1])[0];
   const {people} = buildRecord(ms);
   const paid = priceNow() * people.length, cost = costOf(all);
@@ -134,16 +136,35 @@ export function finishSheet() {
     <button class="btn ghost" id="finDrop">Descartar sesión</button>`,
     mount(el) {
       const o = new Odo($('#finBig', el)); o.set(0); setTimeout(() => o.set(tot), 140);
-      $('#finShare', el).onclick = () => app.shareCard(buildRecord(Date.now() - S.session.start).rec);
+      $('#finShare', el).onclick = () => app.shareCard(buildRecord(end() - S.session.start).rec);
       $('#finSave', el).onclick = () => {
-        const {rec, people: ppl} = buildRecord(Date.now() - S.session.start);
+        const {rec, people: ppl} = buildRecord(end() - S.session.start);
         S.history.push(rec);
         ppl.forEach(x => x.m.forEach(m => S.trophies[m] = (S.trophies[m] || 0) + 1));
+        // Platos de la carta que aún no tienen nota: se proponen para puntuarlos
+        const toRate = Object.keys(all).filter(k => { const t = typeById(k); return t && t.menu && !t.rate; }).slice(0, 12);
         resetSession(); closeSheet(); hud('Sesión guardada'); celebrate('confetti', 110); feedback('win');
-        app.backupNudge && app.backupNudge();
+        if (toRate.length && app.rateListSheet) setTimeout(() => app.rateListSheet(toRate), 900);
+        else app.backupNudge && app.backupNudge();
       };
       twoStep($('#finDrop', el), 'Toca otra vez para descartar', () => { resetSession(); closeSheet(); hud('Sesión descartada'); });
     }});
+}
+/* ---------- Sesiones olvidadas ---------- */
+const STALE = 3 * 3600e3;
+export function staleCheck() {
+  const s = S.session; if (!s.start) return;
+  if (!s.log.length) { if (Date.now() - s.start > STALE) resetSession(); return; }
+  const last = s.log[s.log.length - 1].t, idle = Date.now() - last;
+  if (idle < STALE || (s.staleSnooze && Date.now() - s.staleSnooze < STALE) || isSheetOpen()) return;
+  const when = new Date(s.start).toLocaleDateString('es-ES', {weekday:'long', day:'numeric', month:'long'});
+  openSheet({title:'Sesión sin terminar', cancel:'Ahora no', body:`
+    <div class="sh-hero">${illu('reloj', 'hero-illu')}<h4>¿Terminamos la sesión del ${when}?</h4><p>Empezó a las ${hhmm(s.start)} y lleva ${durShort(idle)} sin piezas. Se guarda con la hora de la última pieza.</p></div>
+    <div class="kv"><div><span>Piezas</span><b>${s.log.length}</b></div><div><span>Duración real</span><b>${durShort(last - s.start)}</b></div></div>
+    <button class="btn" id="stEnd">Terminar y guardar</button>
+    <button class="btn plain" id="stKeep">Seguir con ella</button>`,
+    mount(el) { $('#stEnd', el).onclick = () => finishSheet(last + 60000); $('#stKeep', el).onclick = () => closeSheet(); },
+    onClose() { s.staleSnooze = Date.now(); save(); }});
 }
 export function resetSession() {
   app.releaseAwake && app.releaseAwake();

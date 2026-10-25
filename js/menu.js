@@ -195,16 +195,20 @@ export function parseMenu(text) {
 export function buffetPrices(text) {
   const lines = String(text).split(/\r?\n/).map(cleanLine), out = {};
   lines.forEach((l, i) => {
-    const n = norm(l), ctxt = norm(lines.slice(Math.max(0, i - 2), i + 1).join(' '));
-    if (/nino|infantil|menor|cm\b|bebida|suplemento/.test(n)) return;
-    const vals = [...l.matchAll(/(\d{1,2}[.,]\d{2})\s*€?|€\s*(\d{1,2}[.,]\d{2})/g)].map(m => parseFloat((m[1] || m[2]).replace(',', '.'))).filter(v => v >= 8 && v <= 60);
-    if (!vals.length || !/buffet|adulto|persona|libre|menu|precio|mediodia|noche|semana|festivo|cena|comida/.test(ctxt)) return;
-    const v = vals[0];
-    const noon = /mediodia|medio dia|comida|almuerzo|lunes a viernes|de lunes|laborables/.test(n), night = /noche|cena/.test(n), wk = /fin(es)? de semana|festivo|sabado|domingo/.test(n);
-    if (noon && out.noon == null) out.noon = v;
-    if (night && out.night == null) out.night = v;
-    if (wk && out.weekend == null) out.weekend = v;
-    if (!noon && !night && !wk && out.any == null) out.any = v;
+    const ctxt = norm(lines.slice(Math.max(0, i - 2), i + 1).join(' '));
+    if (!/buffet|adulto|persona|libre|menu|precio|mediodia|noche|semana|festivo|cena|comida/.test(ctxt)) return;
+    // Cada precio se asocia al texto que tiene delante: "mediodía 14,90 € · noche y fin de semana 17,90 €"
+    let prev = 0;
+    for (const m of l.matchAll(/(\d{1,2}[.,]\d{2})\s*€?|€\s*(\d{1,2}[.,]\d{2})/g)) {
+      const seg = norm(l.slice(prev, m.index)); prev = m.index + m[0].length;
+      const v = parseFloat((m[1] || m[2]).replace(',', '.'));
+      if (v < 8 || v > 60 || /nino|infantil|menor|cm\b|bebida|suplemento/.test(seg)) continue;
+      const noon = /mediodia|medio dia|comida|almuerzo|lunes a viernes|de lunes|laborables/.test(seg), night = /noche|cena/.test(seg), wk = /fin(es)? de semana|festivo|sabado|domingo/.test(seg);
+      if (noon && out.noon == null) out.noon = v;
+      if (night && out.night == null) out.night = v;
+      if (wk && out.weekend == null) out.weekend = v;
+      if (!noon && !night && !wk && out.any == null && !/nino|infantil|menor/.test(norm(l))) out.any = v;
+    }
   });
   if (out.any != null) { ['noon', 'night', 'weekend'].forEach(k => { if (out[k] == null) out[k] = out.any; }); }
   delete out.any;
@@ -212,21 +216,90 @@ export function buffetPrices(text) {
 }
 
 /* ---------- Enlaces a la carta dentro de una web ---------- */
+const NOT_MENU = /reserv|pedido|delivery|glovo|uber|just ?eat|instagram|facebook|tripadvisor|google com maps|maps google|goo gl|maps app|wa me|whatsapp|cookies|privacidad|legal|aviso|login|\bcart\b|carrito|blog|trabaja|empleo|contacto|politica|terminos|tel |mailto|javascript/;
+const absUrl = (href, base) => { try { const u = new URL(href.replace(/&amp;/g, '&'), base); return /^https?:$/.test(u.protocol) ? u : null; } catch (e) { return null; } };
+// Enlaces directos a archivos que se pueden leer: Google Drive y Dropbox
+export function directUrl(u) {
+  const d = u.match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?(?:[^#]*&)?id=)([\w-]{20,})/);
+  if (d) return `https://drive.google.com/uc?export=download&id=${d[1]}`;
+  if (/dropbox\.com\//.test(u)) { try { const x = new URL(u); x.searchParams.set('dl', '1'); return x.href; } catch (e) {} }
+  return u;
+}
+// Todos los enlaces de un texto en Markdown (también los que envuelven una imagen y las direcciones sueltas)
+export function mdLinks(text) {
+  const out = [], t = String(text);
+  for (const m of t.matchAll(/\[!\[([^\]]*)\]\(([^)\s]+)[^)]*\)\]\(([^)\s]+)[^)]*\)/g)) out.push({label:m[1], href:m[3], img:m[2]});
+  const rest = t.replace(/\[!\[[^\]]*\]\([^)]*\)\]\([^)]*\)/g, ' ');
+  for (const m of rest.matchAll(/(!?)\[([^\]]{0,120})\]\(([^)\s]+)[^)]*\)/g)) out.push(m[1] ? {label:m[2], href:m[3], image:true} : {label:m[2], href:m[3]});
+  for (const m of rest.replace(/\]\([^)]*\)/g, ' ').matchAll(/https?:\/\/[^\s<>"')\]]+\.pdf\b[^\s<>"')\]]*/gi)) out.push({label:'', href:m[0]});
+  return out;
+}
 export function findMenuLinks(text, base) {
-  const out = [], seen = new Set();
-  for (const m of String(text).matchAll(/\[([^\]]{0,80})\]\(([^)\s]+)\)/g)) {
-    const label = norm(m[1]), href = m[2];
-    let url; try { url = new URL(href, base); } catch (e) { continue; }
-    if (!/^https?:$/.test(url.protocol)) continue;
-    const u = norm(url.href);
-    if (/reserv|pedido|delivery|glovo|uber|just ?eat|instagram|facebook|tripadvisor|google|maps|wa me|cookies|privacidad|legal|aviso|login|\bcart\b|carrito|blog|trabaja/.test(u + ' ' + label)) continue;
-    const pdf = /\.pdf(\b|$)/i.test(url.pathname);
-    const score = (pdf ? 3 : 0) + (/carta|menu|buffet/.test(label) ? 3 : 0) + (/carta|menu|buffet|sushi|platos/.test(norm(url.pathname)) ? 2 : 0) + (base && url.host === new URL(base).host ? 1 : 0);
-    if (score < 2) continue;
-    const key = url.href.replace(/#.*$/, ''); if (seen.has(key) || key === base) continue; seen.add(key);
-    out.push({url:key, score});
+  const out = new Map(), host = base ? new URL(base).host.replace(/^www\./, '') : '';
+  for (const l of mdLinks(text)) {
+    if (l.image) continue;
+    const url = absUrl(l.href, base); if (!url) continue;
+    const label = norm(l.label + ' ' + (l.img ? l.img.split('/').pop() : '')), path = norm(decodeURIComponent(url.pathname));
+    if (NOT_MENU.test(norm(url.href) + ' ' + label)) continue;
+    const pdf = /\.pdf$/i.test(url.pathname), file = /drive\.google|dropbox/.test(url.host);
+    const same = url.host.replace(/^www\./, '') === host;
+    const score = (pdf ? 3 : 0) + (file ? 3 : 0) + (/carta|menu|buffet|platos|nuestra cocina|precios/.test(label) ? 4 : 0) + (/carta|menu|buffet|platos|sushi|precios/.test(path) ? 2 : 0) + (same ? 1 : 0) + (/uploads/.test(path) ? 1 : 0);
+    if (score < 3 || (!same && !pdf && !file && score < 6)) continue;
+    const key = directUrl(url.href.replace(/#.*$/, ''));
+    if (key === base || key === base + '/' || (out.get(key) || 0) >= score) continue;
+    out.set(key, score);
   }
-  return out.sort((a, b) => b.score - a.score).map(x => x.url).slice(0, 4);
+  return [...out.entries()].sort((a, b) => b[1] - a[1]).map(x => x[0]).slice(0, 6);
+}
+// Imágenes que parecen la carta (para leerlas con OCR si la web no la tiene en texto)
+export function findMenuImages(text, base) {
+  const out = new Map();
+  for (const l of mdLinks(text)) {
+    // Una imagen dentro de un enlace a otra imagen suele ser la miniatura de la foto grande de la carta; si enlaza a una página, es un botón
+    const src = l.image ? l.href : l.img && /\.(jpe?g|png|webp)(\?|$)/i.test(l.href) ? l.href : null; if (!src) continue;
+    const url = absUrl(src, base); if (!url || /\.(svg|gif)(\?|$)/i.test(url.pathname) || /logo|icon|favicon|banner|avatar|flag|whatsapp|facebook|instagram/i.test(url.pathname)) continue;
+    const label = norm(l.label + ' ' + decodeURIComponent(url.pathname.split('/').pop()));
+    const score = (/carta|menu|buffet|precios|platos/.test(label) ? 4 : 0) + (/nigiri|maki|sushi|roll|postres|entrantes/.test(label) ? 1 : 0) + (!l.image ? 1 : 0);
+    if (score >= 4 && !out.has(url.href)) out.set(url.href, score);
+  }
+  return [...out.entries()].sort((a, b) => b[1] - a[1]).map(x => x[0]).slice(0, 4);
+}
+// Rutas habituales de la carta en las webs de restaurantes
+export const guessPaths = base => { const o = new URL(base).origin; return ['/carta', '/menu', '/carta-buffet', '/nuestra-carta', '/la-carta', '/buffet', '/carta.pdf', '/menu.pdf'].map(p => o + p); };
+
+/* ---------- Encontrar la web oficial entre resultados de búsqueda ---------- */
+const AGG = /tripadvisor|thefork|eltenedor|facebook|instagram|google\.|goo\.gl|yelp|restaurantguru|just-?eat|glovo|ubereats|deliveroo|wanderlog|paginasamarillas|cylex|foursquare|tiktok|youtube|twitter|x\.com|linkedin|infoisinfo|top-rated|sluurpy|groupon|booking|wikipedia|duckduckgo|bing\.com|guiarepsol|michelin|mapcarta|waze|apple\.com|pinterest|trustpilot|habitissimo|cronica|diario|elnorte|periodico|noticias/i;
+export const MENU_SITES = /carta\.menu|lacarte\.menu|menu\.restaurant|restaurantes\.menu/i;
+const GENERIC_NAME = new Set('restaurante restaurant buffet libre sushi bar japones japonesa japanese asiatico asian wok cocina china chino casa grill the de del la el los las y and & take away food comida'.split(' '));
+// Enlaces de la salida de Markdown de un buscador (DuckDuckGo codifica el destino en uddg=)
+export function linksFromSearch(md) {
+  const out = [];
+  for (const l of mdLinks(md)) {
+    if (l.image) continue;
+    let h = l.href; const ud = h.match(/[?&]uddg=([^&]+)/); if (ud) { try { h = decodeURIComponent(ud[1]); } catch (e) {} }
+    if (h.startsWith('//')) h = 'https:' + h;
+    if (!/^https?:\/\//.test(h) || /duckduckgo\.com|bing\.com\/(ck|search)|r\.jina\.ai/.test(h)) continue;
+    out.push({url:h, title:l.label.replace(/[*_#]/g, '').trim(), snippet:''});
+  }
+  return out;
+}
+export function pickSite(results, place) {
+  const words = norm(place.name || '').split(' ').filter(w => w.length >= 3);
+  const key = words.filter(w => !GENERIC_NAME.has(w)); const tok = key.length ? key : words;
+  const city = norm(place.city || '');
+  let site = null, best = 0; const menus = [];
+  for (const r of results) {
+    let u; try { u = new URL(r.url); } catch (e) { continue; }
+    const host = norm(u.host.replace(/^www\./, '')).replace(/ /g, ''), text = norm(r.title + ' ' + r.snippet), path = norm(decodeURIComponent(u.pathname));
+    if (MENU_SITES.test(u.host)) { if (tok.some(w => text.includes(w) || path.includes(w))) menus.push(u.href); continue; }
+    if (AGG.test(u.host)) continue;
+    const hits = tok.filter(w => host.includes(w)).length, titleHits = tok.filter(w => text.includes(w)).length;
+    let score = hits * 5 + titleHits * 2 + (city && text.includes(city) ? 1 : 0) + (/carta|menu|buffet/.test(path + ' ' + text) ? 1 : 0);
+    if (!hits && titleHits < Math.min(2, tok.length)) continue;
+    if (/carta|menu|\.pdf/.test(path) && (hits || titleHits)) menus.push(directUrl(u.href));
+    if (score > best) { best = score; site = u.origin + '/'; }
+  }
+  return {site, menus:[...new Set(menus)].slice(0, 4)};
 }
 
 /* ---------- Plato → pieza del contador ---------- */

@@ -16,11 +16,12 @@ export const undoStack = [];
 function cardHTML(t) {
   const mark = S.settings.allergenMode === 'mark' && hasAllergen(t);
   const plate = (CATS.find(c => c.id === t.cat) || CATS[0]).plate;
-  return `<div class="pc zero${mark ? ' alg' : ''}" data-k="${t.id}" style="--pc:${plate}" tabindex="0" role="button" aria-label="Sumar ${esc(t.name)}${mark ? '. Contiene alérgenos que has marcado' : ''}">
+  return `<div class="pc zero${mark ? ' alg' : ''}" data-k="${t.id}" style="--pc:${plate}" tabindex="0" role="button" aria-label="Sumar ${esc(t.name)}${t.rate ? `. Tu nota: ${t.rate} de 5` : ''}${(t.mods || []).length ? '. ' + t.mods.length + ' detalles' : ''}${mark ? '. Contiene alérgenos que has marcado' : ''}">
     <button class="pc-minus" aria-label="Quitar ${esc(t.name)}">${ui('minus')}</button>
     <span class="pc-ic"><i class="plate" aria-hidden="true"></i>${icon(t.id)}</span><span class="pc-n"></span>
     <span class="pc-txt"><span class="pc-name">${esc(t.name)}</span><span class="pc-meta">${money(t.cost)} · ${t.kcal} kcal</span></span>
     ${t.fav ? `<svg viewBox="0 0 24 24" class="fav" aria-hidden="true">${UI.starf}</svg>` : ''}
+    ${t.rate ? `<span class="pc-rate${t.rate >= 4 ? ' top' : ''}" aria-hidden="true">★${t.rate}</span>` : ''}
     ${mark ? `<span class="algb" aria-hidden="true">${ui('warn')}</span>` : ''}
     <span class="pc-plus" aria-hidden="true">${ui('plus')}</span></div>`;
 }
@@ -30,6 +31,9 @@ export function buildGrid() {
   if (menu) {
     // Carta del restaurante: sus propias secciones, con el color de plato de la categoría
     vis.filter(t => t.menu).forEach(t => { let g = groups.find(x => x.sec === t.sec); if (!g) { const c = CATS.find(x => x.id === t.cat) || CATS[0]; groups.push(g = {id:'s' + groups.length, sec:t.sec, name:t.sec, short:t.sec.length > 16 ? t.sec.slice(0, 15) + '…' : t.sec, plate:c.plate, list:[]}); } g.list.push(t); });
+    // Lo que más te gusta, primero; lo que no te gustó, al final
+    const score = t => t.rate ? t.rate - 3 : 0;
+    groups.forEach(g => { if (g.sec) g.list.sort((a, b) => score(b) - score(a)); });
     if (menu.mix) CATS.forEach(c => { const l = vis.filter(t => !t.menu && t.cat === c.id); if (l.length) groups.push({...c, id:'d-' + c.id, name:c.name + ' (de serie)', list:l}); });
   } else CATS.forEach(c => { const l = vis.filter(t => t.cat === c.id); if (l.length) groups.push({...c, list:l}); });
   const lay = S.settings.layout;
@@ -275,6 +279,7 @@ function openCtx(card) {
     {l:`Quitar todas${n ? ` (${n})` : ''}`, i:'trash', red:true, dis:!n, fn:() => removeEntries(e => e.d === S.active && e.k === k)},
     'sep',
     {l:t.fav ? 'Quitar de favoritas' : 'Añadir a favoritas', i:t.fav ? 'starf' : 'star', fn:() => { t.fav = !t.fav; save(); buildGrid(); hud(t.fav ? 'Añadida a favoritas' : 'Quitada de favoritas'); }},
+    {l:t.rate ? `Tu nota: ${'★'.repeat(t.rate)}` : 'Puntuar', i:'starf', sub:t.note || '¿Te gusta? La próxima vez sale primero', fn:() => app.rateSheet(k)},
     {l:'Detalles y editar', i:'pencil', sub:'Coste, alérgenos y nutrición', fn:() => app.typeSheet(k)},
   ], {extra:wrap, blur:true});
 }

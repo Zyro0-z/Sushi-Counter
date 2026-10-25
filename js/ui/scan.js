@@ -26,16 +26,25 @@ function prep(file, max = 1600) {
     img.src = url;
   });
 }
-// Texto de una foto; también se usa para leer cartas (más resolución para la letra pequeña)
-export async function ocrFile(file, set = () => {}, max = 1600) {
-  const [T, canvas] = await Promise.all([loadLib(), prep(file, max)]);
-  const worker = await T.createWorker('spa', 1, {logger:m => { if (m.status === 'recognizing text') set('Leyendo el texto', .3 + m.progress * .7); else set('Cargando el lector', (m.progress || 0) * .3); }});
-  try { const {data} = await worker.recognize(canvas); return data.text || ''; } finally { worker.terminate(); }
+// Texto de fotos (tickets y cartas). Un solo lector para varias imágenes seguidas, que cargarlo cuesta.
+// Cada fuente puede ser un archivo, un Blob o un canvas ya preparado.
+export async function ocrMany(sources, set = () => {}, max = 2400) {
+  const T = await loadLib(); let i = 0;
+  const worker = await T.createWorker('spa', 1, {logger:m => { const k = sources.length > 1 ? ` (${i + 1} de ${sources.length})` : ''; if (m.status === 'recognizing text') set('Leyendo el texto' + k, (i + .3 + m.progress * .7) / sources.length); else set('Cargando el lector', (m.progress || 0) * .3 / sources.length); }});
+  const out = [];
+  try {
+    for (; i < sources.length; i++) {
+      const src = sources[i];
+      try { const canvas = src instanceof HTMLCanvasElement ? src : await prep(src, max); const {data} = await worker.recognize(canvas); out.push(data.text || ''); } catch (e) { out.push(''); }
+    }
+  } finally { worker.terminate(); }
+  return out;
 }
-export function pickImage(cb) {
-  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*'; inp.style.display = 'none';
+export async function ocrFile(file, set = () => {}, max = 1600) { return (await ocrMany([file], set, max))[0]; }
+export function pickImage(cb, multiple = false) {
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*'; inp.multiple = multiple; inp.style.display = 'none';
   document.body.appendChild(inp);
-  inp.onchange = () => { const f = inp.files[0]; inp.remove(); if (f) cb(f); };
+  inp.onchange = () => { const f = [...inp.files]; inp.remove(); if (f.length) cb(multiple ? f : f[0]); };
   inp.click();
 }
 export function scanTicket() {

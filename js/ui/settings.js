@@ -2,7 +2,7 @@
 import {S, save, saveNow, fresh, setState} from '../store.js';
 import {CATS, ALLERGENS, DEFAULT_TYPES, DINER_COLORS, ACCENTS, SKINS, CURRENCIES, PRICE_SLOTS, TEMPLATES, FOOD_COLORS} from '../catalog.js';
 import {ui, alg, TPL, medal, illu} from '../icons.js';
-import {openFinder, menuSheet, menuCount} from './carta.js';
+import {openFinder, menuSheet, menuCount, readerSheet} from './carta.js';
 import {me, initial, money, fmtDec, parseNum, nf0, typeById, sortTypes, macroOf, level, activeTitle, slotFor, currentBuffet, sessionSlot, priceNow} from '../logic.js';
 import {$, $$, esc, app, icon, openSheet, closeSheet, twoStep, stepper, bindStepper, seg, bindSeg, sw, applyLook} from './common.js';
 import {feedback, hud, sound} from '../fx.js';
@@ -79,6 +79,10 @@ export function renderSettings(dir) {
       <button class="row accent" id="addBuf">${ui('plus', '', 'width:22px;height:22px')}<span class="row-l">Añadir buffet</span></button>
       <button class="row accent" id="scanRow">${ui('camera', '', 'width:22px;height:22px')}<span class="row-l">Escanear un ticket</span></button>
     </div><p class="gfoot">El precio se elige solo según el momento: mediodía (lunes a viernes antes de las 17:00), noche o fin de semana. Ahora toca «${PRICE_SLOTS.find(s => s.id === slot).name.toLowerCase()}».</p></div>
+    <div class="gsec"><div class="glabel">Cartas de restaurantes</div><div class="group">
+      <button class="row nav-row" id="readerRow" style="--ins:58px"><span class="ri" style="--rc:#FF9500">${ui('bolt')}</span><span class="row-l">Lector de cartas</span><span class="row-v">${S.settings.reader ? 'Propio' : 'Público'}</span>${ui('chev', 'chev')}</button>
+      <div class="row" style="--ins:58px"><span class="ri" style="--rc:#34C759">${ui('pin')}</span><span class="row-l">Detectar el restaurante al llegar</span>${sw('inDetect', S.settings.detect !== false, 'Detectar el restaurante al llegar')}</div>
+    </div><p class="gfoot">Con tu ubicación te propone el buffet en el que estás y carga su carta. La ubicación no sale de tu móvil salvo para preguntar al mapa qué restaurantes hay alrededor.</p></div>
     <div class="gsec"><div class="glabel">Moneda</div><div class="group"><div class="row">${seg('cur', [['EUR', 'Euro €'], ['USD', 'Dólar $'], ['GBP', 'Libra £']], st.cur)}</div></div></div>`;
   }
   if (page === 'types') {
@@ -179,6 +183,7 @@ function wire(page, root) {
     if (t.dataset.ton) { typeById(t.dataset.ton).on = t.checked; save(); app.buildGrid(); feedback('tick'); }
     if (t.id === 'inMascot') { st.mascot = t.checked; save(); app.updateCounter(); }
     if (t.id === 'inHap') { st.haptics = t.checked; save(); feedback('tick'); }
+    if (t.id === 'inDetect') { st.detect = t.checked; save(); feedback('tick'); }
     if (t.id === 'inAwake') { st.awake = t.checked; save(); st.awake ? app.keepAwake() : app.releaseAwake(); }
     if (t.id === 'inKcal') { st.kcalAlert = t.checked; save(); app.updateCounter(); }
     if (t.id === 'inContrast') { st.contrast = t.checked; save(); applyLook(); }
@@ -201,6 +206,7 @@ function wire(page, root) {
   on('addBuf', () => buffetSheet());
   on('scanRow', () => app.scanIntro());
   on('findRow', () => openFinder());
+  on('readerRow', () => readerSheet());
   on('newType', () => customTypeSheet());
   on('resetCosts', () => { S.types.forEach(t => { const d = DEFAULT_TYPES.find(x => x.id === t.id); if (d) { t.cost = d.cost; t.carta = d.carta; } }); save(); app.buildGrid(); renderSettings(); hud('Costes restaurados'); });
   on('expData', () => app.exportBackup());
