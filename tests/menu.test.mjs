@@ -192,3 +192,49 @@ test('los platos sin palabra clave salen como dudosos', () => {
   assert.ok(by('Patatas bravas') && by('Patatas bravas').unsure);
   assert.ok(by('Tarta de queso') && !by('Tarta de queso').unsure);
 });
+
+// Carta con «Nombre / 2 uds» y la descripción debajo, a veces partida en dos líneas
+const TITLED = `## URAMAKIS
+Tartar doble / 2 uds
+Tartar de salmón y lubina crudos
+y gambas al vapor con aguacate
+Rollo de salmón / 2 uds
+Queso crema envuelto de salmón
+y pasta kataifi con salsa teriyaki
+Rollo de espárragos de atún / 2 uds
+Espárragos en tempura envuelta en rollo de
+atún con salsa teriyaki y queso crema
+Carpaccio mixto / 4 uds
+Carpaccio de salmón, atún y lubina
+## GUNKANS
+Gunkan de salmón picante / 2 uds
+Gunkan de atún picante / 2 uds
+y sésamo, atún, tabasco, pistachos
+Gunkan de soja tobiko / 2 uds
+Gunkan de fruta / 3 uds
+Bolas de arroz venus / 2 uds
+con queso crema`;
+
+test('las descripciones debajo de cada plato no se cuentan como platos', () => {
+  const {items} = parseMenu(TITLED);
+  assert.deepEqual(items.map(i => i.name), ['Tartar doble', 'Rollo de salmón', 'Rollo de espárragos de atún', 'Carpaccio mixto', 'Gunkan de salmón picante', 'Gunkan de atún picante', 'Gunkan de soja tobiko', 'Gunkan de fruta', 'Bolas de arroz venus']);
+  const rollo = items[1];
+  assert.equal(rollo.like, 'uramaki'); assert.ok(!rollo.unsure);
+  assert.ok(rollo.mods.includes('cheese') && rollo.mods.includes('crispy'), rollo.mods.join());
+  assert.match(rollo.desc, /kataifi/);
+  assert.equal(items[2].prot, 'atun');
+  assert.ok(!items.some(i => i.unsure));
+});
+
+import {webPlaces, sigWords} from '../js/menu.js';
+test('ofrece la web de un restaurante que no está en el mapa', () => {
+  const res = [{url:'https://www.tripadvisor.es/Restaurant_Review-Sushisom_Vallsur.html', title:'SUSHISOM VALLSUR, Valladolid - Tripadvisor', snippet:''},
+    {url:'https://sushisom.com/restaurantes/vallsur/', title:'Sushisom Vallsur | Restaurante japonés en Valladolid', snippet:'Buffet libre japonés en el centro comercial Vallsur'},
+    {url:'https://sushisom.com/carta/', title:'Carta - Sushisom', snippet:''}];
+  const w = webPlaces(res, 'sushisom vallsur');
+  assert.equal(w.length, 1);
+  assert.equal(w[0].name, 'Sushisom Vallsur');
+  assert.equal(w[0].host, 'sushisom.com');
+  assert.equal(w[0].url, 'https://sushisom.com/restaurantes/vallsur/');
+  assert.deepEqual(sigWords('tan tan ramen palencia'), ['tan', 'tan', 'palencia']);
+});

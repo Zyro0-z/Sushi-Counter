@@ -1092,3 +1092,5 @@ a.btn{text-decoration:none}
 .g-how summary svg:first-child{color:#34A853}
 .g-txt{margin:0 14px 10px;font-size:14px;color:var(--label2);line-height:1.4}
 .g-how li{grid-template-columns:auto 1fr}
+.fd-ic.web{background:color-mix(in srgb,#0A84FF 14%,var(--sheet-card));color:#0A84FF}.fd-ic.web svg{width:24px;height:24px}
+.fd-web{margin-top:10px}

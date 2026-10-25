@@ -2,7 +2,7 @@
 // Orden de lectura: lector propio (si está activado) → r.jina.ai → allorigins. La carta puede estar en la web,
 // en un PDF (con texto o escaneado), en Google Drive o en fotos de la web: se prueba todo antes de rendirse.
 import {S, save} from '../store.js';
-import {parseMenu, findMenuLinks, findMenuImages, guessPaths, pickSite, linksFromSearch, directUrl, norm} from '../menu.js';
+import {parseMenu, findMenuLinks, findMenuImages, guessPaths, pickSite, linksFromSearch, directUrl, norm, webPlaces} from '../menu.js';
 import {ocrMany} from './scan.js';
 
 const PHOTON = 'https://photon.komoot.io/api/';
@@ -220,6 +220,8 @@ export async function webSearch(q) {
   }
   return [];
 }
+// Restaurantes que no están en el mapa: su web, buscando el nombre en internet
+export async function findOnWeb(q) { try { return webPlaces(await webSearch(q), q); } catch (e) { return []; } }
 export async function details(pl) {
   if (pl.website !== undefined) return pl;
   // Restaurante de Google Maps: su web, a través del lector propio

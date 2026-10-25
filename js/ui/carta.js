@@ -3,12 +3,12 @@
 import {S, save} from '../store.js';
 import {PRICE_SLOTS, CURRENCIES} from '../catalog.js';
 import {ui, illu, iconInner} from '../icons.js';
-import {parseMenu, menuType, MOD_NAME, norm} from '../menu.js';
+import {parseMenu, menuType, MOD_NAME, norm, sigWords, placeName} from '../menu.js';
 import {money, fmtDec, parseNum, currentBuffet, typeById, ctx, lifetime} from '../logic.js';
 import {$, $$, esc, app, openSheet, closeSheet, twoStep, sw, seg, bindSeg, isSheetOpen} from './common.js';
 import {feedback, hud, celebrate, announce} from '../fx.js';
 import {ocrMany, pickImage} from './scan.js';
-import {searchPlaces, nearPlaces, findMenu, host, fixUrl, mapsUrl, ownReader, testReader, locate, dist} from './lector.js';
+import {searchPlaces, nearPlaces, findMenu, findOnWeb, host, fixUrl, mapsUrl, ownReader, testReader, locate, dist} from './lector.js';
 
 const fmtDist = m => m == null ? '' : m < 1000 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000).toFixed(1).replace('.', ',')} km`;
 export const menuCount = bid => S.types.filter(t => t.menu === bid && !t.deleted).length;
@@ -21,11 +21,17 @@ const resultRow = (p, i) => `<button class="row fd-r" data-i="${i}" style="--ins
   <span class="row-d">${esc([p.street, p.city].filter(Boolean).join(', ') || 'Sin dirección')}</span>
   <span class="fd-tags">${p.cuisine ? `<em class="fd-tag${p.asian ? '' : ' plain'}">${esc(p.cuisine)}</em>` : ''}${p.website || p.menuUrl ? `<em class="fd-tag web">${ui('globe')}Web</em>` : ''}</span></span>${p.d != null ? `<span class="row-v num">${fmtDist(p.d)}</span>` : ''}${chev()}</button>`;
 const skeleton = () => `<div class="group">${Array.from({length:4}, () => '<div class="row sk-row"><i class="sk sk-ic"></i><span class="row-main"><i class="sk sk-t"></i><i class="sk sk-d"></i></span></div>').join('')}</div>`;
-const webRow = q => q ? `<div class="group fd-web"><button class="row fd-r" data-i="web" style="--ins:66px"><span class="fd-ic">${ui('globe')}</span><span class="row-main"><span class="row-t">¿No sale? Buscar «${esc(q)}» en internet</span><span class="row-d">Buscamos su web y su carta por el nombre</span></span>${chev()}</button></div>` : '';
-const groupsHTML = (list, q = '') => {
-  const a = list.filter(p => p.asian), o = list.filter(p => !p.asian);
+const webRow = q => q ? `<div class="group fd-web"><button class="row fd-r" data-i="web" style="--ins:66px"><span class="fd-ic web">${ui('globe')}</span><span class="row-main"><span class="row-t">¿No sale? Buscar «${esc(q)}» en internet</span><span class="row-d">Buscamos su web y su carta por el nombre</span></span>${chev()}</button></div>` : '';
+// Resultados de internet: webs de restaurantes que no están en el mapa
+const webGroup = web => web === 'wait' ? `<div class="glabel">En internet</div><div class="group"><div class="row sk-row"><i class="sk sk-ic"></i><span class="row-main"><i class="sk sk-t"></i><i class="sk sk-d"></i></span></div></div>`
+  : web && web.length ? `<div class="glabel">En internet · ${web.length}</div><div class="group">${web.map((w, i) => `<button class="row fd-r" data-w="${i}" style="--ins:66px"><span class="fd-ic web">${ui('globe')}</span><span class="row-main"><span class="row-t">${esc(w.name)}</span><span class="row-d">${esc(w.snippet || 'Su web')}</span><span class="fd-tags"><em class="fd-tag web">${ui('globe')}${esc(w.host)}</em></span></span>${chev()}</button>`).join('')}</div>` : '';
+// ¿Algún sitio del mapa se llama como lo buscado? Si no, lo de internet va primero
+const closeMatch = (list, q) => { const w = sigWords(q); return !w.length || list.some(p => w.filter(x => norm(p.name).includes(x)).length >= Math.max(1, w.length - 1)); };
+const groupsHTML = (list, q = '', web = null) => {
+  const a = list.filter(p => p.asian), o = list.filter(p => !p.asian), top = !closeMatch(list, q);
   const g = (t, l, off) => l.length ? `<div class="glabel">${t} · ${l.length}</div><div class="group">${l.map((p, i) => resultRow(p, i + off)).join('')}</div>` : '';
-  return (a.length && o.length ? g('Sushi, asiáticos y buffets', a, 0) + g('Otros restaurantes', o, a.length) : `<div class="group">${list.map(resultRow).join('')}</div>`) + webRow(q);
+  const map = list.length ? (a.length && o.length ? g('Sushi, asiáticos y buffets', a, 0) + g('Otros restaurantes', o, a.length) : `<div class="glabel">En el mapa · ${list.length}</div><div class="group">${list.map(resultRow).join('')}</div>`) : '';
+  return top ? webGroup(web) + map + webRow(q) : map + webGroup(web) + webRow(q);
 };
 export function openFinder(q = '') {
   let list = [], seq = 0, tm = 0;
@@ -41,12 +47,15 @@ export function openFinder(q = '') {
     </div><p class="gfoot">Escribe el tipo y la ciudad («sushi Palencia») para ver todos los asiáticos de la ciudad, o el nombre del restaurante. ${ownReader() && S.settings.readerGoogle ? 'Con los datos de Google Maps.' : 'Con los datos de OpenStreetMap: si falta alguno, búscalo por internet.'}</p></div>`,
     mount(el) {
       const box = $('#fdRes', el), inp = $('#fdQ', el);
-      const paint = msg => { box.innerHTML = msg || (list.length ? groupsHTML(list, inp.value.trim()) : ''); };
+      let web = null;
+      const paint = msg => { box.innerHTML = msg || (list.length || web ? groupsHTML(list, inp.value.trim(), web) : ''); };
       const run = async exact => {
-        const v = inp.value.trim(); lastQ = v; if (v.length < 3) { list = []; paint(); return; }
-        const my = ++seq; paint(skeleton());
+        const v = inp.value.trim(); lastQ = v; if (v.length < 3) { list = []; web = null; paint(); return; }
+        const my = ++seq; web = null; paint(skeleton());
+        // Al pulsar Buscar con un nombre, también se busca su web en internet (por si no está en el mapa)
+        if (exact && sigWords(v).length) { web = 'wait'; findOnWeb(v).then(w => { if (my !== seq) return; web = w; paint(); }); }
         try { const r = await searchPlaces(v, exact); if (my !== seq) return; list = r;
-          paint(r.length ? '' : `<div class="empty fd-empty"><b>No está en el mapa</b>${exact ? 'Muchos restaurantes no están en el mapa libre. Búscalo por internet:' : 'Pulsa Buscar en el teclado para buscar a fondo.'}</div>${exact ? webRow(v) : ''}`); announce(`${r.length} restaurantes`); }
+          paint(r.length || web ? '' : `<div class="empty fd-empty"><b>No está en el mapa</b>${exact ? 'Muchos restaurantes no están en el mapa libre. Búscalo por internet:' : 'Pulsa Buscar en el teclado para buscar también en internet.'}</div>${exact ? webRow(v) : ''}`); announce(`${r.length} restaurantes`); }
         catch (e) { if (my === seq) paint(`<div class="empty fd-empty"><b>No hay conexión con el buscador</b>Puedes añadir la carta con fotos o con su enlace.</div>`); }
       };
       inp.addEventListener('input', () => { clearTimeout(tm); tm = setTimeout(() => run(false), 450); });
@@ -57,8 +66,10 @@ export function openFinder(q = '') {
         catch (e) { if (my === seq) paint(`<div class="empty fd-empty"><b>No sabemos dónde estás</b>Permite la ubicación (Ajustes del iPhone › Privacidad › Localización) o búscalo por su nombre.</div>`); }
       };
       box.addEventListener('click', e => {
+        const w = e.target.closest('[data-w]');
+        if (w && Array.isArray(web)) { feedback('tick'); const x = web[+w.dataset.w]; importPlace({name:x.name, city:'', osm:null, gid:null, website:/carta|menu|\.pdf/i.test(x.url) ? new URL(x.url).origin + '/' : x.url, menuUrl:/carta|menu|\.pdf/i.test(x.url) ? x.url : null}); return; }
         const r = e.target.closest('[data-i]'); if (!r) return; feedback('tick');
-        if (r.dataset.i === 'web') { const q = inp.value.trim(); importPlace({name:q, city:'', osm:null, gid:null}); return; }
+        if (r.dataset.i === 'web') { const q = inp.value.trim(); importPlace({name:placeName(q.replace(/(^|\s)\S/g, c => c.toUpperCase())), city:'', osm:null, gid:null}); return; }
         importPlace(list[+r.dataset.i]);
       });
       $('#fdShots', el).onclick = () => shotsSheet();

@@ -27,8 +27,8 @@ export function sectionOf(text) { const n = norm(text); for (const [c, re] of SE
 
 /* ---------- Platos: pieza parecida, proteína y detalles ---------- */
 const RULES = [
-  [/gunkan/, 'gunkan'], [/temaki/, 'temaki'], [/onigiri/, 'onigiri'], [/futo ?maki/, 'futomaki'], [/dragon/, 'dragon'],
-  [/california/, 'california'], [/ura ?maki|\brolls?\b/, 'uramaki'], [/hoso ?maki|\bmakis?\b/, 'maki'],
+  [/gunkan/, 'gunkan'], [/temaki/, 'temaki'], [/onigiri|bolas? de arroz/, 'onigiri'], [/futo ?maki/, 'futomaki'], [/dragon/, 'dragon'],
+  [/california/, 'california'], [/ura ?maki|\brolls?\b|\brollos?\b(?! de primavera)/, 'uramaki'], [/hoso ?maki|\bmakis?\b/, 'maki'],
   [/tataki/, 'tataki'], [/sashimi|tartar|ceviche|carpaccio|usuzukuri|\bpoke\b/, 'sashimi'], [/nigiri|niguiri|nigri/, 'nigiri'],
   [/gyoza|gyosa|jiaozi|dumpling|empanadilla|wonton|siu mai|shumai|har gow/, 'gyoza'], [/takoyaki/, 'takoyaki'],
   [/karaage|kara age|pollo frito|pollo crujiente|alitas|nuggets?/, 'karaage'], [/\bbaos?\b/, 'bao'],
@@ -126,7 +126,7 @@ const PRICE_RE = /(?:€\s*)?(\d{1,3}(?:[.,]\d{1,2})?)\s*(?:€|eur\b|euros\b)|(
 const PIECES_RE = /\(?\s*\b(\d{1,2})\s*(?:u|uds?|unid(?:ades)?|pz|pzs|piezas?|pcs|ud)\b\.?\s*\)?|\bx\s?(\d{1,2})\b/i;
 const PROPER = {california:'California', philadelphia:'Philadelphia', pekin:'Pekín', tokio:'Tokio', osaka:'Osaka', kobe:'Kobe',};
 function tidy(s) {
-  s = s.replace(/\s+/g, ' ').replace(/^[\s,.;:–—-]+|[\s,.;:–—-]+$/g, '').trim();
+  s = s.replace(/\s+/g, ' ').replace(/^[\s,.;:–—\/|-]+|[\s,.;:–—\/|-]+$/g, '').trim();
   const words = s.split(' '), letters = s.replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/g, '');
   const upper = letters && letters.replace(/[^A-ZÁÉÍÓÚÜÑ]/g, '').length / letters.length > .6;
   const titled = words.filter(w => w.length > 2 && /^[A-ZÁÉÍÓÚÑ]/.test(w)).length > Math.max(1, words.filter(w => w.length > 2).length / 2);
@@ -172,10 +172,15 @@ export function parseItem(seg, section) {
 }
 
 /* ---------- Carta completa ---------- */
+// Palabras con las que una línea sigue a la anterior («…envuelta en rollo de» / «atún con salsa…»)
+const JOIN_END = /\b(de|del|con|y|e|en|a|al|sobre|o|u|sin|la|el|las|los)\s*$|,\s*$/i;
+const JOIN_START = /^(y|e|con|de|del|en|o|u|sin|a|al|sobre)\b/i;
 export function parseMenu(text) {
-  const items = [], seen = new Set();
-  let section = null, sectionName = '';
+  // 1. Líneas de la carta, con su sección
+  const rows = [];
+  let section = null, sectionName = '', n = 0;
   for (const raw of String(text).split(/\r?\n/)) {
+    n++;
     if (/^\s*(Title|URL Source|Markdown Content|Published Time|Warning):/i.test(raw)) continue;
     const segs = raw.includes('|') ? raw.split('|') : raw.split(/\s[·•|]\s|\t+|\s{3,}/);
     for (const part of segs) {
@@ -185,16 +190,41 @@ export function parseMenu(text) {
         const pure = norm(s.replace(PRICE_RE, '').replace(PIECES_RE, '')).split(' ').filter(Boolean).every(x => HEAD_WORDS.has(x) || /^\d+$/.test(x));
         if (c && pure) { section = c; sectionName = c !== 'skip' ? tidy(s.replace(PRICE_RE, '').replace(PIECES_RE, '')) : ''; }
         else if (/^\s*#/.test(raw) || c) { section = null; sectionName = ''; }
+        rows.push({head:true, n});
         continue;
       }
-      if (s.length > 140) continue;
-      const it = parseItem(s, section); if (!it) continue;
-      const key = norm(it.name).replace(/s\b/g, '');
-      if (seen.has(key)) continue; seen.add(key);
-      it.sec = sectionName || CATS.find(c => c.id === it.cat).name;
-      items.push(it);
+      if (s.length > 160) { rows.push({skip:true, n}); continue; }
+      rows.push({s, n, section, sectionName, units:PIECES_RE.test(s) || PRICE_RE.test(s), lower:/^[a-záéíóúñ]/.test(s), joinStart:JOIN_START.test(s), item:parseItem(s, section)});
     }
   }
+  // 2. ¿Carta con «nombre / N uds» y descripción debajo? Entonces solo los que llevan unidades o precio son platos
+  const parsed = rows.filter(r => r.item), withUnits = parsed.filter(r => r.units).length;
+  const titled = withUnits >= 4 && withUnits >= parsed.length * .3;
+  // 3. Platos, con las líneas de descripción pegadas al plato de encima
+  const items = [], seen = new Set();
+  let last = null, lastRow = null, prevText = '';
+  const attach = r => {
+    last.desc = (last.desc ? last.desc + ' ' : '') + r.s.replace(/^[-–—]\s*/, '');
+    const c = classify(last.name, last.desc, last.section);
+    if (c) { last.mods = c.mods; if (!last.prot && c.prot) { last.prot = c.prot; last.tpl = c.tpl; last.color = c.color; last.costF = c.costF; last.base = c.base; } }
+    lastRow = r;
+  };
+  for (const r of rows) {
+    if (r.head || r.skip) { last = r.head ? null : last; prevText = ''; continue; }
+    const near = last && lastRow && r.n - lastRow.n <= 2 && r.section === last.section;
+    const continues = near && (r.lower || r.joinStart || JOIN_END.test(prevText));
+    prevText = r.s;
+    if (continues || (titled && near && !r.units && last.titledDesc !== false)) { attach(r); continue; }
+    if (!r.item) { if (last && !titled) last.titledDesc = false; continue; }
+    const it = r.item;
+    const key = norm(it.name).replace(/s\b/g, '');
+    if (seen.has(key)) { last = null; continue; }
+    seen.add(key);
+    it.sec = r.sectionName || CATS.find(c => c.id === it.cat).name;
+    it.section = r.section;
+    items.push(it); last = it; lastRow = r;
+  }
+  items.forEach(i => { delete i.section; delete i.titledDesc; i.desc = (i.desc || '').slice(0, 160); });
   return {items, prices:buffetPrices(text)};
 }
 
@@ -307,6 +337,30 @@ export function pickSite(results, place) {
     if (score > best) { best = score; site = u.origin + '/'; }
   }
   return {site, menus:[...new Set(menus)].slice(0, 4)};
+}
+
+// Webs de restaurante entre los resultados de búsqueda, para ofrecerlas como sitios cuando no están en el mapa
+const CUIS_W = /^(sushi|ramen|wok|buffet|bufet|japones|japonesa|asiatico|asiatica|chino|china|restaurante|restaurant|bar)$/;
+export const sigWords = q => norm(q).split(' ').filter(w => w.length >= 3 && !GENERIC_NAME.has(w) && !CUIS_W.test(w));
+// Nombre de un sitio: se respeta tal cual, salvo si viene todo en mayúsculas
+export const placeName = t => { t = String(t).replace(/\s+/g, ' ').trim(); return /[a-záéíóúñ]/.test(t) ? t : t.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase()); };
+export function webPlaces(results, q) {
+  const tok = sigWords(q).length ? sigWords(q) : norm(q).split(' ').filter(w => w.length >= 3);
+  const out = new Map();
+  for (const r of results) {
+    let u; try { u = new URL(r.url); } catch (e) { continue; }
+    if (AGG.test(u.host) || MENU_SITES.test(u.host)) continue;
+    const host = norm(u.host.replace(/^www\./, '')).replace(/ /g, ''), title = norm(r.title);
+    const hits = tok.filter(w => host.includes(w) || title.includes(w)).length;
+    if (!hits || !tok.filter(w => host.includes(w)).length && hits < Math.min(2, tok.length)) continue;
+    const key = u.host.replace(/^www\./, ''); if (out.has(key)) continue;
+    const parts = String(r.title).split(/\s[|–—·:-]\s|\s\|\s?/).map(x => x.trim()).filter(Boolean);
+    const name = parts.sort((a, b) => tok.filter(w => norm(b).includes(w)).length - tok.filter(w => norm(a).includes(w)).length)[0] || key;
+    // En las cadenas, la página del local (…/vallsur/) es la buena; si no, la portada
+    const path = norm(decodeURIComponent(u.pathname));
+    out.set(key, {name:placeName(name).slice(0, 40), url:/carta|menu|\.pdf/i.test(u.pathname) || tok.some(w => path.includes(w)) ? u.href : u.origin + '/', host:key, snippet:r.snippet || ''});
+  }
+  return [...out.values()].slice(0, 4);
 }
 
 /* ---------- Plato → pieza del contador ---------- */
