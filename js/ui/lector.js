@@ -1,7 +1,7 @@
 // Red de la carta del restaurante: buscar sitios de comida, encontrar su web y leer su carta.
 // Orden de lectura: lector propio (si está activado) → r.jina.ai → allorigins. La carta puede estar en la web,
 // en un PDF (con texto o escaneado), en Google Drive o en fotos de la web: se prueba todo antes de rendirse.
-import {S} from '../store.js';
+import {S, save} from '../store.js';
 import {parseMenu, findMenuLinks, findMenuImages, guessPaths, pickSite, linksFromSearch, directUrl, norm} from '../menu.js';
 import {ocrMany} from './scan.js';
 
@@ -22,15 +22,23 @@ export async function get(url, ms = 15000) {
 export const host = u => { try { return new URL(u).host.replace(/^www\./, ''); } catch (e) { return String(u); } };
 export const fixUrl = u => { u = String(u || '').trim(); if (!u) return ''; if (!/^https?:\/\//i.test(u)) u = 'https://' + u; try { return new URL(u).href; } catch (e) { return ''; } };
 export const dist = (a, b) => { const r = Math.PI / 180, x = (b.lon - a.lon) * r * Math.cos((a.lat + b.lat) / 2 * r), y = (b.lat - a.lat) * r; return Math.sqrt(x * x + y * y) * 6371e3; };
-export const mapsUrl = pl => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([pl.name, pl.street, pl.city].filter(Boolean).join(', '))}`;
+export const mapsUrl = pl => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([pl.name, pl.street, pl.city].filter(Boolean).join(', '))}${pl.gid ? '&query_place_id=' + encodeURIComponent(pl.gid) : ''}`;
 
 /* ---------- Lector propio (Vercel) ---------- */
 export const ownReader = () => (S.settings.reader || '').trim().replace(/\/+$/, '');
 const own = (q) => `${ownReader()}/api/leer?${q}`;
 export async function testReader(base) {
   base = fixUrl(base).replace(/\/+$/, ''); if (!base) return false;
-  try { const j = await (await get(`${base}/api/leer?ping=1`, 10000)).json(); return j && j.ok ? base : false; } catch (e) { return false; }
+  try {
+    const j = await (await get(`${base}/api/leer?ping=1`, 10000)).json();
+    if (!j || !j.ok) return false;
+    S.settings.readerGoogle = !!j.google; S.settings.readerAt = Date.now(); save();
+    return base;
+  } catch (e) { return false; }
 }
+// Una vez al día se comprueba si el lector tiene activada la búsqueda de Google
+export function refreshReader() { const b = ownReader(); if (b && Date.now() - (S.settings.readerAt || 0) > 12 * 3600e3) testReader(b); }
+const googleOn = () => !!(ownReader() && S.settings.readerGoogle);
 
 /* ---------- Lugares de comida ---------- */
 let geo = null;
@@ -47,20 +55,28 @@ const fromTags = (tg = {}) => ({
   menuUrl:fixUrl(tg['website:menu'] || tg['menu:url'] || (/^https?:/.test(tg.menu || '') ? tg.menu : '')) || null,
   cuisine:cuisineOf(tg.cuisine), asian:ASIAN.test(tg.cuisine || '') || ASIAN.test(tg.name || ''),
 });
-const place = (o) => ({name:o.name, street:o.street || '', city:o.city || '', osm:o.osm, lat:o.lat, lon:o.lon, website:o.website, menuUrl:o.menuUrl, cuisine:o.cuisine || '', asian:!!o.asian, d:geo && o.lat != null ? dist(geo, o) : null});
-// Busca mientras escribes (Photon) y, al pulsar Buscar, también en Nominatim. Solo sitios de comida: nada de ayuntamientos.
+const place = (o) => ({name:o.name, street:o.street || '', city:o.city || '', osm:o.osm || null, gid:o.gid || null, lat:o.lat, lon:o.lon, website:o.website, menuUrl:o.menuUrl, cuisine:o.cuisine || '', asian:!!o.asian, d:geo && o.lat != null ? dist(geo, o) : null});
+// Búsqueda: nombres en OpenStreetMap mientras escribes; al pulsar Buscar, además Nominatim, todos los asiáticos
+// de la ciudad (se llamen como se llamen) y Google Maps si el lector propio tiene clave. Solo sitios de comida.
+const CUISINE_Q = /\b(sushi|japones|japonesa|japo|asiatico|asiatica|chino|china|oriental|wok|buffet|bufet|ramen|poke|coreano|tailandes|vietnamita|nikkei)\b/;
 export async function searchPlaces(q, exact = false) {
   const base = new URLSearchParams({q, limit:'15'}); if (geo) { base.set('lat', geo.lat); base.set('lon', geo.lon); }
   const photon = tag => { const u = new URLSearchParams(base); u.set('osm_tag', 'amenity:' + tag); return get(PHOTON + '?' + u, 12000).then(r => r.json()).then(j => j.features || []).catch(() => []); };
-  const lists = await Promise.all([photon('restaurant'), photon('fast_food'), exact ? nominatim(q) : Promise.resolve([])]);
-  const out = new Map();
+  const byCuisine = CUISINE_Q.test(norm(q));
+  const lists = await Promise.all([photon('restaurant'), photon('fast_food'), exact ? nominatim(q) : [], exact || byCuisine ? cuisineInArea(q) : [], exact && googleOn() ? googlePlaces(q) : []]);
+  const osm = new Map();
   lists[0].concat(lists[1]).forEach(f => {
     const p = f.properties || {}; if (p.osm_key !== 'amenity' || !FOOD.test(p.osm_value || '') || !p.name) return;
     const [lon, lat] = f.geometry.coordinates;
-    out.set(p.osm_type + p.osm_id, place({name:p.name, street:[p.street, p.housenumber].filter(Boolean).join(' '), city:p.city || p.town || p.village || p.county || '', osm:p.osm_type + p.osm_id, lat, lon, asian:ASIAN.test(p.name)}));
+    osm.set(p.osm_type + p.osm_id, place({name:p.name, street:[p.street, p.housenumber].filter(Boolean).join(' '), city:p.city || p.town || p.village || p.county || '', osm:p.osm_type + p.osm_id, lat, lon, asian:ASIAN.test(p.name)}));
   });
-  lists[2].forEach(p => { if (!out.has(p.osm)) out.set(p.osm, p); });
-  return enrich([...out.values()]);
+  [...lists[2], ...lists[3]].forEach(p => { if (!osm.has(p.osm)) osm.set(p.osm, p); });
+  return merge(lists[4], await enrich([...osm.values()]));
+}
+// Google primero (tiene casi todos); los del mapa libre que no estén ya, detrás
+function merge(google, osm) {
+  const same = (a, b) => norm(a.name) === norm(b.name) && (a.lat == null || b.lat == null || dist(a, b) < 300);
+  return sortPlaces([...google, ...osm.filter(o => !google.some(g => same(g, o)))]);
 }
 async function nominatim(q) {
   try {
@@ -69,10 +85,42 @@ async function nominatim(q) {
       return place({name:x.name, street:[a.road, a.house_number].filter(Boolean).join(' '), city:a.city || a.town || a.village || '', osm:x.osm_type[0].toUpperCase() + x.osm_id, lat:+x.lat, lon:+x.lon, ...fromTags({...x.extratags, name:x.name})}); });
   } catch (e) { return []; }
 }
+// «sushi palencia»: todos los restaurantes asiáticos de la ciudad, aunque su nombre no diga «sushi»
+async function cuisineInArea(q) {
+  const rest = norm(q).replace(CUISINE_Q, ' ').replace(/\b(restaurantes?|en|de|del|la|el|los|las|libre|comida|cerca|y)\b/g, ' ').replace(/\s+/g, ' ').trim();
+  let box = null;
+  try {
+    if (rest.length >= 3) {
+      const f = ((await (await get(`${PHOTON}?q=${encodeURIComponent(rest)}&limit=1&osm_tag=place`, 10000)).json()).features || [])[0];
+      if (f) { const e = f.properties.extent, [lon, lat] = f.geometry.coordinates; box = e ? [e[3], e[0], e[1], e[2]] : [lat - .05, lon - .07, lat + .05, lon + .07]; }
+    } else if (geo) box = [geo.lat - .045, geo.lon - .06, geo.lat + .045, geo.lon + .06];
+    if (!box) return [];
+    const bb = box.map(v => v.toFixed(5)).join(','), F = '["amenity"~"^(restaurant|fast_food|food_court)$"]["name"]';
+    const oq = `[out:json][timeout:25];(nwr${F}["cuisine"~"sushi|japanese|asian|chinese|wok|buffet|korean|thai|vietnamese|ramen|poke|nikkei",i](${bb});nwr${F}["name"~"sushi|wok|asia|japo|china|chino|orient|buffet|tokyo|tokio|kyoto|osaka|sakura|nippon|ramen|poke|udon|kami|zen|koi|oishi|nikkei|maki|panda|dragon|bambu|bamboo|fuji|hana|yuki|kirin|lotus|loto",i](${bb}););out center tags 120;`;
+    const j = await (await get(OVERPASS + encodeURIComponent(oq), 30000)).json();
+    return (j.elements || []).map(e => { const tg = e.tags || {};
+      return place({name:tg.name, street:[tg['addr:street'], tg['addr:housenumber']].filter(Boolean).join(' '), city:tg['addr:city'] || '', osm:e.type[0].toUpperCase() + e.id, lat:e.lat ?? e.center?.lat, lon:e.lon ?? e.center?.lon, ...fromTags(tg), asian:true}); });
+  } catch (e) { return []; }
+}
+// Google Maps a través del lector propio (solo si tiene clave): casi todos los restaurantes, con su web
+const GTYPE = {sushi_restaurant:'Sushi', japanese_restaurant:'Japonés', chinese_restaurant:'Chino', asian_restaurant:'Asiático', buffet_restaurant:'Buffet', ramen_restaurant:'Ramen', korean_restaurant:'Coreano', thai_restaurant:'Tailandés', vietnamese_restaurant:'Vietnamita',
+  italian_restaurant:'Italiano', spanish_restaurant:'Español', pizza_restaurant:'Pizza', hamburger_restaurant:'Hamburguesas', fast_food_restaurant:'Comida rápida', seafood_restaurant:'Marisco', mediterranean_restaurant:'Mediterráneo', mexican_restaurant:'Mexicano', indian_restaurant:'Indio'};
+async function googlePlaces(q, near = null, radio = 20000) {
+  try {
+    const c = near || geo, u = `lugares=${encodeURIComponent(q)}${c ? `&lat=${c.lat}&lon=${c.lon}&radio=${radio}` : ''}`;
+    const j = await (await get(own(u), 15000)).json(); if (!Array.isArray(j)) return [];
+    return j.filter(p => p.name && (p.types || []).some(t => /restaurant|food|meal|cafe|bar$/.test(t))).map(p => {
+      const types = (p.types || []).join(' '), asian = /sushi|japanese|chinese|asian|buffet|ramen|korean|thai|vietnamese/.test(types) || ASIAN.test(p.name);
+      const [street, ...rest] = String(p.address || '').split(',');
+      return place({name:p.name, street:street || '', city:rest.join(',').trim(), gid:p.gid, lat:p.lat, lon:p.lon, cuisine:GTYPE[p.type] || Object.keys(GTYPE).filter(k => types.includes(k)).map(k => GTYPE[k])[0] || '', asian});
+    });
+  } catch (e) { return []; }
+}
 // Pide al mapa la web y el tipo de cocina de todos los resultados de una vez
 async function enrich(list) {
-  if (!list.length) return list;
-  const ids = {N:[], W:[], R:[]}; list.forEach(p => ids[p.osm[0]] && ids[p.osm[0]].push(p.osm.slice(1)));
+  const ask = list.filter(p => p.osm && p.website === undefined);
+  if (!ask.length) return sortPlaces(list);
+  const ids = {N:[], W:[], R:[]}; ask.forEach(p => ids[p.osm[0]] && ids[p.osm[0]].push(p.osm.slice(1)));
   const q = `[out:json][timeout:15];(${ids.N.length ? `node(id:${ids.N});` : ''}${ids.W.length ? `way(id:${ids.W});` : ''}${ids.R.length ? `relation(id:${ids.R});` : ''});out tags;`;
   try {
     const j = await (await get(OVERPASS + encodeURIComponent(q), 15000)).json();
@@ -85,9 +133,13 @@ export const sortPlaces = list => list.slice().sort((a, b) => (b.asian - a.asian
 export async function nearPlaces(radius = 1500) {
   await locate();
   const q = `[out:json][timeout:20];nwr(around:${radius},${geo.lat},${geo.lon})["amenity"~"^(restaurant|fast_food|food_court)$"]["name"];out center tags 80;`;
-  const j = await (await get(OVERPASS + encodeURIComponent(q), 25000)).json();
-  return sortPlaces((j.elements || []).map(e => { const tg = e.tags || {};
-    return place({name:tg.name, street:[tg['addr:street'], tg['addr:housenumber']].filter(Boolean).join(' '), city:tg['addr:city'] || '', osm:e.type[0].toUpperCase() + e.id, lat:e.lat ?? e.center?.lat, lon:e.lon ?? e.center?.lon, ...fromTags(tg)}); }));
+  const [osm, g] = await Promise.all([
+    get(OVERPASS + encodeURIComponent(q), 25000).then(r => r.json()).then(j => (j.elements || []).map(e => { const tg = e.tags || {};
+      return place({name:tg.name, street:[tg['addr:street'], tg['addr:housenumber']].filter(Boolean).join(' '), city:tg['addr:city'] || '', osm:e.type[0].toUpperCase() + e.id, lat:e.lat ?? e.center?.lat, lon:e.lon ?? e.center?.lon, ...fromTags(tg)}); })).catch(() => []),
+    googleOn() && radius > 300 ? googlePlaces('restaurante sushi japonés asiático buffet', geo, Math.max(radius, 2500)) : [],
+  ]);
+  if (!osm.length && !g.length) throw new Error('vacío');
+  return merge(g, osm);
 }
 
 /* ---------- Leer páginas, PDF e imágenes ---------- */
@@ -170,6 +222,8 @@ export async function webSearch(q) {
 }
 export async function details(pl) {
   if (pl.website !== undefined) return pl;
+  // Restaurante de Google Maps: su web, a través del lector propio
+  if (pl.gid && googleOn()) { try { const j = await (await get(own('ficha=' + encodeURIComponent(pl.gid)), 12000)).json(); return {...pl, website:fixUrl(j.website) || null}; } catch (e) { return {...pl, website:null}; } }
   const type = {N:'node', W:'way', R:'relation'}[pl.osm && pl.osm[0]]; if (!type) return {...pl, website:null};
   try { const j = await (await get(OVERPASS + encodeURIComponent(`[out:json][timeout:15];${type}(${pl.osm.slice(1)});out tags;`), 15000)).json(); return {...pl, ...fromTags((j.elements[0] || {}).tags)}; }
   catch (e) { try { const j = await (await get(`${NOMINATIM}lookup?format=json&extratags=1&osm_ids=${pl.osm}`, 12000)).json(); return {...pl, ...fromTags((j[0] || {}).extratags)}; } catch (e2) { return {...pl, website:null}; } }
@@ -184,7 +238,9 @@ export async function findMenu(pl, step, alive = () => true) {
   const sources = [];   // [{url, text}]
   const seen = new Set(), scans = [], images = new Set();
   let site = pl.website, extra = pl.menuUrl ? [pl.menuUrl] : [];
-  const items = () => parseMenu(sources.map(s => s.text).join(SEP)).items.length;
+  // Solo cuentan los platos seguros (con palabra de pieza); las portadas y los avisos legales no suman
+  const sure = t => parseMenu(t).items.filter(i => !i.unsure).length;
+  const items = () => sources.reduce((a, x) => a + (x.n ?? (x.n = sure(x.text))), 0);
   const read = async u => {
     u = directUrl(u); if (seen.has(u) || !alive()) return; seen.add(u);
     step(1, /\.pdf|drive\.google/i.test(u) ? 'Abriendo la carta en PDF' : 'Abriendo ' + host(u) + decodeURIComponent(new URL(u).pathname).replace(/\/$/, '').slice(0, 28));
@@ -223,8 +279,12 @@ export async function findMenu(pl, step, alive = () => true) {
     if (canv.length && alive()) ocrText = (await ocrMany(canv.slice(0, 6), (m) => step(2, m))).join(SEP);
   }
   step(3, '');
-  const all = sources.map(s => s.text).join(SEP) + (ocrText ? SEP + ocrText : '');
-  const res = parseMenu(all);
-  const best = sources.map(s => ({url:s.url, n:parseMenu(s.text).items.length})).sort((a, b) => b.n - a.n)[0];
-  return {...res, place:{...pl, website:site || pl.website}, src:best && best.n ? best.url : (site || null), fail:res.items.length < 3 ? (sources.length ? 'empty' : 'read') : null};
+  // Se juntan solo las páginas que de verdad tienen carta (3 platos seguros o más)
+  const good = sources.filter(x => x.n >= 3);
+  const all = (good.length ? good : sources).map(x => x.text).join(SEP) + (ocrText ? SEP + ocrText : '');
+  const res = parseMenu(all), nSure = res.items.filter(i => !i.unsure).length;
+  // Muchos dudosos frente a pocos seguros: es una web, no una carta; se quedan solo los seguros
+  if (res.items.length > nSure * 3) res.items = res.items.filter(i => !i.unsure);
+  const best = sources.slice().sort((a, b) => b.n - a.n)[0];
+  return {...res, place:{...pl, website:site || pl.website}, src:best && best.n ? best.url : (site || null), fail:nSure < 3 ? (sources.length ? 'empty' : 'read') : null};
 }

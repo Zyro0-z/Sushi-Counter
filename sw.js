@@ -1,5 +1,5 @@
 // Guarda la app para que funcione sin conexión. Sube la versión al publicar cambios.
-const CACHE = 'sushi-v7';
+const CACHE = 'sushi-v8';
 const CORE = [
   './', './index.html', './manifest.webmanifest', './apple-touch-icon.png', './icon-512.png', './css/app.css',
   './js/main.js', './js/store.js', './js/catalog.js', './js/icons.js', './js/art.js', './js/menu.js', './js/logic.js', './js/fx.js',

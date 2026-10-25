@@ -21,10 +21,11 @@ const resultRow = (p, i) => `<button class="row fd-r" data-i="${i}" style="--ins
   <span class="row-d">${esc([p.street, p.city].filter(Boolean).join(', ') || 'Sin dirección')}</span>
   <span class="fd-tags">${p.cuisine ? `<em class="fd-tag${p.asian ? '' : ' plain'}">${esc(p.cuisine)}</em>` : ''}${p.website || p.menuUrl ? `<em class="fd-tag web">${ui('globe')}Web</em>` : ''}</span></span>${p.d != null ? `<span class="row-v num">${fmtDist(p.d)}</span>` : ''}${chev()}</button>`;
 const skeleton = () => `<div class="group">${Array.from({length:4}, () => '<div class="row sk-row"><i class="sk sk-ic"></i><span class="row-main"><i class="sk sk-t"></i><i class="sk sk-d"></i></span></div>').join('')}</div>`;
-const groupsHTML = list => {
+const webRow = q => q ? `<div class="group fd-web"><button class="row fd-r" data-i="web" style="--ins:66px"><span class="fd-ic">${ui('globe')}</span><span class="row-main"><span class="row-t">¿No sale? Buscar «${esc(q)}» en internet</span><span class="row-d">Buscamos su web y su carta por el nombre</span></span>${chev()}</button></div>` : '';
+const groupsHTML = (list, q = '') => {
   const a = list.filter(p => p.asian), o = list.filter(p => !p.asian);
-  const g = (t, l, off) => l.length ? `<div class="glabel">${t}</div><div class="group">${l.map((p, i) => resultRow(p, i + off)).join('')}</div>` : '';
-  return a.length && o.length ? g('Sushi, asiáticos y buffets', a, 0) + g('Otros restaurantes', o, a.length) : `<div class="group">${list.map(resultRow).join('')}</div>`;
+  const g = (t, l, off) => l.length ? `<div class="glabel">${t} · ${l.length}</div><div class="group">${l.map((p, i) => resultRow(p, i + off)).join('')}</div>` : '';
+  return (a.length && o.length ? g('Sushi, asiáticos y buffets', a, 0) + g('Otros restaurantes', o, a.length) : `<div class="group">${list.map(resultRow).join('')}</div>`) + webRow(q);
 };
 export function openFinder(q = '') {
   let list = [], seq = 0, tm = 0;
@@ -37,15 +38,15 @@ export function openFinder(q = '') {
       ${navRow('fdShots', 'camera', '#30A46C', 'Fotos o capturas de la carta', 'Por ejemplo, de Google Maps o de la mesa')}
       ${navRow('fdLink', 'link', '#0A84FF', 'Pegar el enlace de la carta', 'De su web o un PDF')}
       ${navRow('fdText', 'doc', '#8E8E93', 'Pegar el texto de la carta', 'Copiado de cualquier sitio')}
-    </div><p class="gfoot">Solo salen bares y restaurantes de OpenStreetMap. Los asiáticos y los buffets, primero.</p></div>`,
+    </div><p class="gfoot">Escribe el tipo y la ciudad («sushi Palencia») para ver todos los asiáticos de la ciudad, o el nombre del restaurante. ${ownReader() && S.settings.readerGoogle ? 'Con los datos de Google Maps.' : 'Con los datos de OpenStreetMap: si falta alguno, búscalo por internet.'}</p></div>`,
     mount(el) {
       const box = $('#fdRes', el), inp = $('#fdQ', el);
-      const paint = msg => { box.innerHTML = msg || (list.length ? groupsHTML(list) : ''); };
+      const paint = msg => { box.innerHTML = msg || (list.length ? groupsHTML(list, inp.value.trim()) : ''); };
       const run = async exact => {
         const v = inp.value.trim(); lastQ = v; if (v.length < 3) { list = []; paint(); return; }
         const my = ++seq; paint(skeleton());
         try { const r = await searchPlaces(v, exact); if (my !== seq) return; list = r;
-          paint(r.length ? '' : `<div class="empty fd-empty"><b>No encontramos ese restaurante</b>${exact ? 'Prueba con otra forma del nombre o usa «cerca de mí».' : 'Pulsa Buscar en el teclado para buscar a fondo.'}</div>`); announce(`${r.length} restaurantes`); }
+          paint(r.length ? '' : `<div class="empty fd-empty"><b>No está en el mapa</b>${exact ? 'Muchos restaurantes no están en el mapa libre. Búscalo por internet:' : 'Pulsa Buscar en el teclado para buscar a fondo.'}</div>${exact ? webRow(v) : ''}`); announce(`${r.length} restaurantes`); }
         catch (e) { if (my === seq) paint(`<div class="empty fd-empty"><b>No hay conexión con el buscador</b>Puedes añadir la carta con fotos o con su enlace.</div>`); }
       };
       inp.addEventListener('input', () => { clearTimeout(tm); tm = setTimeout(() => run(false), 450); });
@@ -55,7 +56,11 @@ export function openFinder(q = '') {
         try { const r = await nearPlaces(); if (my !== seq) return; list = r.slice(0, 40); paint(r.length ? '' : `<div class="empty fd-empty"><b>No hay restaurantes cerca</b>Búscalo por su nombre.</div>`); }
         catch (e) { if (my === seq) paint(`<div class="empty fd-empty"><b>No sabemos dónde estás</b>Permite la ubicación (Ajustes del iPhone › Privacidad › Localización) o búscalo por su nombre.</div>`); }
       };
-      box.addEventListener('click', e => { const r = e.target.closest('[data-i]'); if (r) { feedback('tick'); importPlace(list[+r.dataset.i]); } });
+      box.addEventListener('click', e => {
+        const r = e.target.closest('[data-i]'); if (!r) return; feedback('tick');
+        if (r.dataset.i === 'web') { const q = inp.value.trim(); importPlace({name:q, city:'', osm:null, gid:null}); return; }
+        importPlace(list[+r.dataset.i]);
+      });
       $('#fdShots', el).onclick = () => shotsSheet();
       $('#fdLink', el).onclick = () => linkSheet();
       $('#fdText', el).onclick = () => textSheet();
@@ -151,10 +156,10 @@ function shotsFlow(pl = null, merge = null) {
 
 /* ---------- 3. Revisar y añadir ---------- */
 function upsertBuffet(pl, prices) {
-  let b = (pl.osm && S.buffets.find(x => x.place && x.place.osm === pl.osm)) || S.buffets.find(x => norm(x.name) === norm(pl.name || ''));
+  let b = (pl.osm && S.buffets.find(x => x.place && x.place.osm === pl.osm)) || (pl.gid && S.buffets.find(x => x.place && x.place.gid === pl.gid)) || S.buffets.find(x => norm(x.name) === norm(pl.name || ''));
   if (!b) { b = {id:'b' + Date.now().toString(36), name:(pl.name || 'Restaurante').slice(0, 28), prices:prices || {...currentBuffet().prices}}; S.buffets.push(b); }
   else if (prices) b.prices = prices;
-  if (pl.osm || pl.website || pl.lat != null) b.place = {...(b.place || {}), osm:pl.osm || null, street:pl.street || '', city:pl.city || '', lat:pl.lat ?? null, lon:pl.lon ?? null, website:pl.website || null};
+  if (pl.osm || pl.gid || pl.website || pl.lat != null) b.place = {...(b.place || {}), osm:pl.osm || null, gid:pl.gid || null, street:pl.street || '', city:pl.city || '', lat:pl.lat ?? null, lon:pl.lon ?? null, website:pl.website || null};
   return b;
 }
 // Pone una carta en un buffet (desde la revisión o desde la mesa compartida). types: platos ya convertidos.
@@ -177,7 +182,8 @@ export function applyMenu(meta, types, {mix = false, silent = false} = {}) {
 }
 function reviewSheet(data) {
   const {items, prices = {}, place = {}, src} = data;
-  const sel = data.sel || items.map(() => true);
+  // Lo dudoso (sin palabra de pieza) empieza sin marcar
+  const sel = data.sel || items.map(it => !it.unsure);
   const cur = currentBuffet().prices, found = ['noon', 'night', 'weekend'].some(k => prices[k] != null);
   const secs = []; items.forEach((it, i) => { let s = secs.find(x => x.name === it.sec); if (!s) secs.push(s = {name:it.sec, list:[]}); s.list.push(i); });
   const tmp = items.map((it, i) => menuType(it, 'tmp', i));
@@ -185,13 +191,13 @@ function reviewSheet(data) {
   openSheet({title:'Revisar la carta', cancel:'Cancelar', ok:'Añadir', cls:'rv-sheet', body:`
     <div class="rv-hero card"><span class="rv-ill">${illu('carta')}</span><span class="rv-tx"><small>${items.length} platos · ${secs.length} ${secs.length === 1 ? 'sección' : 'secciones'}${src ? ' · ' + esc(host(src)) : ''}</small>
       <input class="rv-name" id="rvName" maxlength="28" placeholder="Nombre del restaurante" value="${esc(place.name || '')}" aria-label="Nombre del restaurante"></span></div>
-    <p class="hub-intro">Quita lo que no quieras contar. Cada plato lleva el dibujo de la pieza más parecida y sus detalles: flambeado, crujiente, picante…</p>
+    <p class="hub-intro">Quita lo que no quieras contar. Cada plato lleva el dibujo de la pieza más parecida y sus detalles: flambeado, crujiente, picante…${items.some(i => i.unsure) ? ` Lo marcado como «¿Es un plato?» empieza sin marcar: actívalo si lo es.` : ''}</p>
     <div class="gsec"><div class="glabel">Precio del buffet por persona</div><div class="group">
       ${PRICE_SLOTS.map(s => `<label class="row"><span class="row-l" style="flex:0 0 auto">${s.name}</span><input class="row-in num" id="rv-${s.id}" inputmode="decimal" value="${fmtDec(prices[s.id] ?? cur[s.id])}"><span class="row-v">${CURRENCIES[S.settings.cur]}</span></label>`).join('')}
     </div><p class="gfoot">${found ? 'Lo hemos leído de su carta: compruébalo.' : 'No venía en la carta: escribe lo que cuesta.'}</p></div>
     ${secs.map((sc, si) => `<div class="gsec"><div class="glabel rv-sec"><span>${esc(sc.name)} · ${sc.list.length}</span><button class="link" data-all="${si}">${sc.list.every(i => sel[i]) ? 'Quitar todos' : 'Poner todos'}</button></div><div class="group">
       ${sc.list.map(i => { const it = items[i]; return `<label class="row rv-row" style="--ins:70px"><span class="rv-ic"><svg viewBox="0 0 48 48" class="pi" aria-hidden="true">${iconInner(tmp[i].id, tmp[i])}</svg></span><span class="row-main"><span class="row-t">${esc(it.name)}</span>
-        ${it.mods.length || it.pieces || it.desc ? `<span class="rv-mods">${it.mods.map(m => `<em class="mtag m-${m}">${MOD_NAME[m]}</em>`).join('')}${it.pieces ? `<em class="mtag">${it.pieces} uds</em>` : ''}${it.desc && !it.mods.length ? `<span class="rv-desc">${esc(it.desc)}</span>` : ''}</span>` : ''}</span>
+        ${it.unsure || it.mods.length || it.pieces || it.desc ? `<span class="rv-mods">${it.unsure ? '<em class="mtag unsure">¿Es un plato?</em>' : ''}${it.mods.map(m => `<em class="mtag m-${m}">${MOD_NAME[m]}</em>`).join('')}${it.pieces ? `<em class="mtag">${it.pieces} uds</em>` : ''}${it.desc && !it.mods.length ? `<span class="rv-desc">${esc(it.desc)}</span>` : ''}</span>` : ''}</span>
         <span class="ck"><input type="checkbox" data-i="${i}" ${sel[i] ? 'checked' : ''} aria-label="Añadir ${esc(it.name)}"><span>${ui('check')}</span></span></label>`; }).join('')}
     </div></div>`).join('')}
     <div class="group"><div class="row"><span class="row-l">Mostrar también las piezas de serie<span class="sub">Si no, el contador solo enseña esta carta</span></span>${sw('rvMix', false)}</div></div>
@@ -291,6 +297,7 @@ export function menuSheet(bid) {
 /* ---------- Lector propio (Vercel) ---------- */
 export function readerSheet() {
   const cur = ownReader();
+  const status = ok => ok ? `● Conectado${S.settings.readerGoogle ? ' · con Google Maps' : ''}` : 'No responde. Revisa la dirección o espera a que Vercel termine de publicarlo.';
   openSheet({title:'Lector de cartas', cancel:'Cerrar', body:`
     <div class="sh-hero">${illu('carta', 'hero-illu')}<h4>Tu propio lector, gratis</h4><p>Lee las webs y los PDF de los restaurantes desde un servidor tuyo. Mucho más fiable que los servicios públicos.</p></div>
     <ol class="gm-steps">
@@ -300,17 +307,23 @@ export function readerSheet() {
     </ol>
     <a class="btn plain" href="https://vercel.com/new" target="_blank" rel="noopener">${ui('globe')}Abrir Vercel</a>
     <div class="group"><label class="row"><input class="row-in" id="rdU" type="url" inputmode="url" placeholder="https://tu-proyecto.vercel.app" autocomplete="off" autocapitalize="off" style="text-align:left" value="${esc(cur)}"></label></div>
-    <p class="gfoot rd-st" id="rdSt">${cur ? '● Activado' : 'Sin activar: se usan los servicios públicos.'}</p>
+    <p class="gfoot rd-st" id="rdSt">${cur ? 'Comprobando…' : 'Sin activar: se usan los servicios públicos.'}</p>
     <button class="btn" id="rdTest">${ui('check')}Comprobar y guardar</button>
-    ${cur ? '<button class="btn ghost" id="rdOff">Desactivar</button>' : ''}`,
+    ${cur ? '<button class="btn ghost" id="rdOff">Desactivar</button>' : ''}
+    <details class="how g-how"><summary>${ui('pin')}<span>Opcional: todos los restaurantes de Google Maps</span>${ui('chevD', 'how-chev')}</summary>
+      <p class="g-txt">El mapa libre no tiene todos los sitios. Con una clave de Google, el buscador usa los datos de Google Maps y encuentra la web de casi cualquier restaurante.</p>
+      <ol>
+        <li><span class="how-n">1</span><span class="how-t">En <b>console.cloud.google.com</b> crea un proyecto y activa la facturación. <b>Pide una tarjeta</b>, pero cada mes son gratis 5.000 búsquedas y 1.000 webs.</span></li>
+        <li><span class="how-n">2</span><span class="how-t">Activa <b>Places API (New)</b> y crea una clave en <b>Credenciales</b>.</span></li>
+        <li><span class="how-n">3</span><span class="how-t">En <b>Places API (New) › Cuotas</b>, limita las peticiones a <b>150 al día</b>: así nunca pasas de lo gratuito.</span></li>
+        <li><span class="how-n">4</span><span class="how-t">En Vercel: tu proyecto › <b>Settings › Environment Variables</b>, añade <b>GOOGLE_PLACES_KEY</b> con la clave y pulsa <b>Redeploy</b>. Luego vuelve aquí y comprueba.</span></li>
+      </ol></details>`,
     mount(el) {
-      $('#rdTest', el).onclick = async () => {
-        const st = $('#rdSt', el); st.textContent = 'Comprobando…'; st.className = 'gfoot rd-st';
-        const ok = await testReader($('#rdU', el).value);
-        if (ok) { S.settings.reader = ok; save(); st.textContent = '● Conectado: ya se usa tu lector'; st.className = 'gfoot rd-st ok'; feedback('mission'); }
-        else { st.textContent = 'No responde. Revisa la dirección o espera a que Vercel termine de publicarlo.'; st.className = 'gfoot rd-st err'; feedback('tick'); }
-      };
-      const off = $('#rdOff', el); if (off) off.onclick = () => { S.settings.reader = ''; save(); closeSheet(); hud('Lector propio desactivado'); };
+      const st = $('#rdSt', el);
+      const check = async v => { st.textContent = 'Comprobando…'; st.className = 'gfoot rd-st'; const ok = await testReader(v); st.textContent = status(ok); st.className = 'gfoot rd-st ' + (ok ? 'ok' : 'err'); return ok; };
+      if (cur) check(cur);
+      $('#rdTest', el).onclick = async () => { const ok = await check($('#rdU', el).value); if (ok) { S.settings.reader = ok; save(); feedback('mission'); } else feedback('tick'); };
+      const off = $('#rdOff', el); if (off) off.onclick = () => { S.settings.reader = ''; S.settings.readerGoogle = false; save(); closeSheet(); hud('Lector propio desactivado'); };
     }});
 }
 

@@ -16,6 +16,7 @@ import {exportBackup, importBackup, exportCSV, shareCard, backupNudge} from './u
 import {showIntro} from './ui/intro.js';
 import {openHub, renderPlay, guideSheet, scanIntro} from './ui/hub.js';
 import {openFinder, menuSheet, menuCount, renderHint, detectPlace, offerMenu, rateSheet, rateListSheet, readerSheet} from './ui/carta.js';
+import {refreshReader} from './ui/lector.js';
 
 /* ---------- Pantalla encendida ---------- */
 let wake = null;
@@ -156,7 +157,7 @@ function boot() {
   shortcuts();
   showIntro();
   keepAwake();
-  setTimeout(() => { if (S.settings.introSeen) { staleCheck(); detectPlace(); } }, 1500);
+  setTimeout(() => { refreshReader(); if (S.settings.introSeen) { staleCheck(); detectPlace(); } }, 1500);
 
   let tick = 0;
   setInterval(() => {

@@ -149,3 +149,46 @@ test('lee varios precios del buffet en la misma línea', () => {
   assert.deepEqual(buffetPrices('Precio buffet: mediodía 14,90 € · noche y fin de semana 17,90 €'), {noon:14.9, night:17.9, weekend:17.9});
   assert.deepEqual(buffetPrices('BUFFET LIBRE\nAdultos 16,50 €\nNiños menores de 120 cm 9,95 €'), {noon:16.5, night:16.5, weekend:16.5});
 });
+
+const JUNK = `Title: La Tagliatella | Restaurantes italianos
+[Book your table](https://latagliatella.example/reservas) [Ver la carta](https://latagliatella.example/carta)
+# Los mejores sabores de Italia
+## Iberian Tartare
+Book your table
+Los mejores sabores de Italia
+Aperitivi
+Antipasti
+La tagliatella cuore felice
+Platos con estrella
+Tartar e carpaccio
+Insalate
+## Restaurantes
+Salamanca
+Sevilla
+Tarragona
+Valencia
+Vizcaya
+Zaragoza
+Restaurante italiano la tagliatella
+Ver la carta
+Información durante el embarazo
+Nuestro blog
+Términos y condiciones
+Aviso legal`;
+
+test('una web sin carta de verdad no se toma por carta', () => {
+  const {items} = parseMenu(JUNK);
+  const sure = items.filter(i => !i.unsure);
+  assert.ok(sure.length < 3, sure.map(i => i.name).join(' | '));
+  for (const bad of ['Book your table', 'Salamanca', 'Zaragoza', 'Ver la carta', 'Nuestro blog', 'Aviso legal', 'Términos y condiciones', 'Información durante el embarazo', 'Restaurante italiano la tagliatella', 'Los mejores sabores de Italia', 'Platos con estrella'])
+    assert.ok(!items.some(i => i.name === bad), bad);
+});
+
+test('los platos sin palabra clave salen como dudosos', () => {
+  const {items} = parseMenu(`## ENTRANTES\nCroquetas caseras de jamón\nPatatas bravas\nEdamame\n## POSTRES\nTarta de queso\nCoulant de chocolate`);
+  const by = n => items.find(i => i.name === n);
+  assert.ok(by('Edamame') && !by('Edamame').unsure);
+  assert.ok(by('Croquetas caseras de jamón') && by('Croquetas caseras de jamón').unsure);
+  assert.ok(by('Patatas bravas') && by('Patatas bravas').unsure);
+  assert.ok(by('Tarta de queso') && !by('Tarta de queso').unsure);
+});

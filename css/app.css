@@ -1087,3 +1087,8 @@ a.btn{text-decoration:none}
 .rd-st.err{color:var(--red)}
 @media (prefers-reduced-motion:reduce){.stars.pop .st.on{animation:none}}
 .sh-head .gb{white-space:nowrap}
+.mtag.unsure{background:color-mix(in srgb,var(--orange) 16%,transparent);color:var(--orange)}
+.g-how summary{color:var(--label)}
+.g-how summary svg:first-child{color:#34A853}
+.g-txt{margin:0 14px 10px;font-size:14px;color:var(--label2);line-height:1.4}
+.g-how li{grid-template-columns:auto 1fr}

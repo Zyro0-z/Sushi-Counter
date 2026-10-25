@@ -24,9 +24,10 @@ Web app con aspecto de iOS para llevar la cuenta de lo que comes en un buffet de
 - Shari, la mascota: reacciona a tu ritmo, se duerme si paras y te da ideas.
 
 **La carta del restaurante**
-- Busca el restaurante por nombre o cerca de ti. Solo salen bares y restaurantes (nada de ayuntamientos), con los asiáticos y buffets primero.
+- Busca el restaurante por nombre, por tipo y ciudad («sushi Palencia»: todos los asiáticos de la ciudad aunque no se llamen «sushi») o cerca de ti. Solo salen bares y restaurantes, con los asiáticos y buffets primero. Si no está en el mapa, se busca su carta por internet con el nombre.
 - Encuentra su web aunque el mapa no la tenga (buscándola en internet), entra en «carta», abre sus PDF (también escaneados y de Google Drive) y lee las fotos de la carta de su web.
 - Si no hay manera: capturas de la carta de Google Maps o fotos de la carta, varias a la vez.
+- Solo se aceptan líneas que parecen platos: lo dudoso sale sin marcar («¿Es un plato?») y una web sin carta de verdad no se toma por carta.
 - Cada plato va en la sección de su carta, con el dibujo de la pieza parecida y sus detalles (flambeado, crujiente, picante, con queso, con salsa, trufa…). Lee también el precio del buffet.
 - Visor de la carta con tu ranking, estrellas por plato y notas; los que más te gustan salen primero en el contador.
 - La carta viaja por la mesa compartida: si uno la añade, a los demás les llega.
@@ -73,6 +74,8 @@ El coste de cada pieza es una estimación de ingredientes con precios de mayoris
 1. Entra en vercel.com con tu cuenta de GitHub.
 2. **Add New › Project**, importa este repositorio y pulsa **Deploy**.
 3. En la app: **Ajustes › Buffets y precios › Lector de cartas**, pega la dirección `….vercel.app` y pulsa **Comprobar y guardar**.
+
+Opcional: con una clave de [Places API (New)](https://developers.google.com/maps/documentation/places/web-service/op-overview) en la variable de entorno `GOOGLE_PLACES_KEY`, el buscador usa los datos de Google Maps (todos los restaurantes y su web). Google pide tarjeta; cada mes son gratis 5.000 búsquedas y 1.000 webs ([precios](https://developers.google.com/maps/billing-and-pricing/pricing)). Pon un límite diario de peticiones en Google Cloud para no pasar de ahí.
 
 ## Desarrollo
 

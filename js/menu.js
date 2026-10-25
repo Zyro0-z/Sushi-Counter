@@ -21,7 +21,7 @@ const HEAD_WORDS = new Set(('y e de del la las los el nuestros nuestras nuestro 
   'nigiris nigiri niguiris sashimis sashimi tatakis tataki gunkans gunkan tartar tartares ceviches ceviche carpaccios usuzukuri makis maki uramakis uramaki rolls roll temakis temaki futomakis ' +
   'hosomakis california sushis entrantes entrante aperitivos aperitivo picar ensaladas ensalada sopas sopa primeros dim sum vapor tapas postres postre dulces dulce helados helado fritos frito ' +
   'frituras wok tempuras tempura tallarines fideos arroces arroz carnes carne pollo pato mariscos marisco segundos principales yakitori teppanyaki robata ramen udon brasa parrilla bebidas bebida ' +
-  'vinos cervezas refrescos cafes licores cocteles infusiones beber al la plancha a').split(' '));
+  'vinos cervezas refrescos cafes licores cocteles infusiones beber al la plancha a flambeados flameados especialidades crujientes picantes vegetarianos veganos combinados hot cold starters desserts mains sides drinks con sin').split(' '));
 const GEN_HEAD = new Set('sushi wok cocina carta menu buffet vapor parrilla brasa teppanyaki robata dim sum picar beber'.split(' '));
 export function sectionOf(text) { const n = norm(text); for (const [c, re] of SECTIONS) if (re.test(n)) return c; return null; }
 
@@ -114,6 +114,11 @@ export function classify(name, desc = '', section = null) {
   return {like:d || g ? like : 'plato', base, cat, mods, prot:prot ? prot[0] : null, color:tpl ? prot[2] : null, tpl, costF:prot && !same && own ? prot[3] : 1};
 }
 
+// Ingredientes y platos que no son piezas del catálogo: sirven para aceptar un plato como «dudoso»
+const FOOD = /\b(salmon|atun|langostinos?|gambas?|pollo|ternera|cerdo|pato|cordero|buey|wagyu|quesos?|huevos?|arroz|fideos?|tallarin(es)?|pasta|pizzas?|ensaladas?|sopas?|cremas?|verduras?|tofu|setas|champinon(es)?|aguacate|pepino|mango|cangrejo|surimi|pulpo|calamar(es)?|sepia|vieiras?|mejillon(es)?|almejas?|bacalao|merluza|dorada|lubina|pescados?|mariscos?|carnes?|costillas?|hamburguesas?|burger|patatas?|croquetas?|empanadillas?|tempura|frit[oa]s?|plancha|brochetas?|salteados?|curry|teriyaki|kimchi|chocolate|tartas?|flan|helados?|mochis?|frutas?|pina|coco|nata|yogur|bao|lasana|risotto|gnocchi|raviolis?|carpaccio|tartar|ceviche|nachos|alitas|nuggets|jamon|chorizo|bacon|beicon|calabacin|berenjena|espinacas|brocoli|cebolla|pimientos?|tomate|lentejas|garbanzos|alubias|anchoas|boquerones|sardinas|chipirones|navajas|pan|tostadas?|bocadillo|sandwich|wrap|tacos?|burrito|quesadilla|kebab|falafel|hummus|dumplings?|baos?|dim sum|siu mai|har gow|natillas|tiramisu|brownie|coulant|cheesecake|profiteroles|crepes?|gofres?|tortitas)\b/;
+// Navegación, avisos legales y textos de la web que nunca son platos
+const NAV = /\b(book|table|order|find|about|careers|sign|privacy|terms|cookies?|reserv\w*|blog|terminos|condiciones|aviso|legal|privacidad|embarazo|informacion|newsletter|suscrib\w*|contact\w*|trabaja|empleo|franquicias?|ubicaci\w*|locales|restaurantes?|tienda|app|descarga\w*|pide|pedir|online|domicilio|delivery|ver la carta|ver mas|descubre|siguenos|nosotros|quienes|galeria|eventos?|regalo|tarjeta|promoci\w*|ofertas?|login|registr\w*|cuenta|carrito|faq|ayuda|mapa|llegar|horarios?|telefono|email|correo|copyright|derechos|politica|sostenibilidad|nutricional|calidad|inicio|home|mejores|sabores|estrella|bienvenid\w*|experiencia|historia|filosofia|equipo|prensa|opiniones|resenas)\b/;
+
 /* ---------- Limpieza de una línea ---------- */
 const SKIP_LINE = /\b(buffet|adultos?|ninos?|infantil|menores?|menu del dia|iva|reservas?|reservar|horarios?|abierto|cerrado|telefono|tel|direccion|alergenos?|alergias|cookies|politica|privacidad|copyright|derechos|siguenos|instagram|facebook|tiktok|whatsapp|pedidos?|domicilio|recoger|envio|google|mapa|login|carrito|suplemento|consultar|precio por persona|todos los|incluye|bebida no incluida|lunes|martes|miercoles|jueves|viernes|sabados?|domingos?|festivos?|mediodia|cena|noches?|fines? de semana)\b/;
 const DRINK = /\b(agua|refrescos?|coca ?cola|fanta|sprite|cervezas?|vinos?|cafes?|zumos?|licor|botella|cava|champagne|sake caliente|whisky|ron|ginebra|cocktail|coctel|mojito|limonada)\b/;
@@ -157,13 +162,13 @@ export function parseItem(seg, section) {
   name = name.replace(/\(\s*\)/g, ' ').replace(/[()]/g, ' ');
   const n = norm(name);
   if (n.length < 3 || n.length > 64 || n.split(' ').length > 10) return null;
-  if (DRINK.test(n) || SKIP_LINE.test(n) || /^\d+$/.test(n) || /https?|www|@/.test(name)) return null;
+  if (DRINK.test(n) || SKIP_LINE.test(n) || NAV.test(n) || /^\d+$/.test(n) || /https?|www|@/.test(name)) return null;
+  const known = RULES.some(([re]) => re.test(n) || re.test(norm(desc)));
+  // Sin palabra de pieza: solo dentro de una sección de la carta, corto y con algún ingrediente; y queda como dudoso
+  if (!known && (!section || section === 'skip' || n.split(' ').length > 7 || !FOOD.test(n + ' ' + norm(desc)))) return null;
   const c = classify(name, desc, section);
   if (!c) return null;
-  // Sin palabra clave de plato, solo vale dentro de una sección conocida y si parece un nombre corto
-  const known = RULES.some(([re]) => re.test(n) || re.test(norm(desc)));
-  if (!known && (!section || section === 'skip' || n.split(' ').length > 6)) return null;
-  return {name:tidy(name), desc:desc.trim().slice(0, 120), price, pieces, ...c};
+  return {name:tidy(name), desc:desc.trim().slice(0, 120), price, pieces, ...c, ...(known ? {} : {unsure:true})};
 }
 
 /* ---------- Carta completa ---------- */
@@ -177,7 +182,9 @@ export function parseMenu(text) {
       const s = cleanLine(part); if (!s || /^[-:| ]+$/.test(s)) continue;
       if (isHeading(segs.length === 1 ? raw : part, s)) {
         const c = sectionOf(s);
-        if (c || /^\s*#/.test(raw)) { section = c; sectionName = c && c !== 'skip' ? tidy(s.replace(PRICE_RE, '').replace(PIECES_RE, '')) : ''; }
+        const pure = norm(s.replace(PRICE_RE, '').replace(PIECES_RE, '')).split(' ').filter(Boolean).every(x => HEAD_WORDS.has(x) || /^\d+$/.test(x));
+        if (c && pure) { section = c; sectionName = c !== 'skip' ? tidy(s.replace(PRICE_RE, '').replace(PIECES_RE, '')) : ''; }
+        else if (/^\s*#/.test(raw) || c) { section = null; sectionName = ''; }
         continue;
       }
       if (s.length > 140) continue;
